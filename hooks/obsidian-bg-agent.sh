@@ -214,7 +214,14 @@ log_run "starting" summary_chars "${#SUMMARY}" hints_chars "${#PROJECT_HINTS}"
 # seize the bot's single MCP session and disrupt the live poller.
 (
   cd "$VAULT" || exit 1
-  claude --dangerously-skip-permissions --strict-mcp-config -p < "$PROMPT_FILE" >> /tmp/obsidian-bg-agent.log 2>&1
+  # --allowedTools enforces the CONSTRAINTS block the prompt already states.
+  # The compaction summary can carry text that originated from the open web
+  # (a page read by /research, a transcript, a cloned repo's README), so the
+  # tool surface must be a real boundary rather than an instruction the model
+  # is asked to respect. Filesystem only: no Bash, no network.
+  claude --dangerously-skip-permissions --strict-mcp-config \
+    --allowedTools "Read,Write,Edit,Glob,Grep" \
+    -p < "$PROMPT_FILE" >> /tmp/obsidian-bg-agent.log 2>&1
   EXIT_CODE=$?
   rm -f "$PROMPT_FILE"
   log_run "completed" duration_sec "$(( $(date +%s) - START_TIME ))" exit_code "$EXIT_CODE"
