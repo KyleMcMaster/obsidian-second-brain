@@ -121,6 +121,7 @@ _codex_emit_skills() {
     } > "$out"
 
     rewrite_tool_neutral "$out"
+    rewrite_skill_root "$out" ".${CODEX_DIR}"
     rewrite_platform_paths "$out" "$CODEX_DIR"
   done
 }

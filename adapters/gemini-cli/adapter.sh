@@ -40,7 +40,7 @@ agent) should follow when the user's request matches its trigger phrase.
 2. When the user's request matches a trigger in the tables below, read the
    matching file under `.gemini/commands/<name>.md` and follow its
    instructions step by step.
-3. Treat the AI-first vault rule (`references/ai-first-rules.md`) as
+3. Treat the AI-first vault rule (`.gemini/references/ai-first-rules.md`) as
    non-negotiable for every note you write: `## For future Claude` preamble,
    rich frontmatter (`type`, `date`, `tags`, `ai-first: true`), `[[wikilinks]]`
    for every person/project/concept, recency markers per external claim,
@@ -72,6 +72,7 @@ _gemini_translate_commands() {
     out="$dst/$(basename "$f")"
     cp "$f" "$out"
     rewrite_tool_neutral "$out"
+    rewrite_skill_root "$out" ".${GEMINI_DIR}"
     rewrite_platform_paths "$out" "$GEMINI_DIR"
   done
 }

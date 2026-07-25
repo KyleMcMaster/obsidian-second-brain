@@ -39,7 +39,7 @@ agent) should follow when the user's request matches its trigger phrase.
 2. When the user's request matches a trigger in the tables below, read the
    matching file under `.opencode/commands/<name>.md` and follow its
    instructions step by step.
-3. Treat the AI-first vault rule (`references/ai-first-rules.md`) as
+3. Treat the AI-first vault rule (`.opencode/references/ai-first-rules.md`) as
    non-negotiable for every note you write: `## For future Claude` preamble,
    rich frontmatter (`type`, `date`, `tags`, `ai-first: true`), `[[wikilinks]]`
    for every person/project/concept, recency markers per external claim,
@@ -71,6 +71,7 @@ _opencode_translate_commands() {
     out="$dst/$(basename "$f")"
     cp "$f" "$out"
     rewrite_tool_neutral "$out"
+    rewrite_skill_root "$out" ".${OPENCODE_DIR}"
     rewrite_platform_paths "$out" "$OPENCODE_DIR"
   done
 }

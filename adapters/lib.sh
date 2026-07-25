@@ -280,11 +280,40 @@ rewrite_tool_neutral() {
 }
 
 # ── Path placeholder rewriting ──────────────────────────────────────────────
-# Source files may reference .claude/ paths directly (because the repo's
-# canonical use was Claude Code). The path-rewrite helper translates them to
-# platform-specific equivalents (.codex/, .gemini/, .opencode/).
+# Command bodies name two kinds of path that only resolve under Claude Code:
+#
+#   1. The SKILL_ROOT placeholder. Claude Code supplies a "Skill root" value at
+#      session start; no other platform does. Every Python-backed command reads
+#      `uv run --directory "SKILL_ROOT" scripts/foo.py`, so SKILL_ROOT must
+#      become the directory that CONTAINS scripts/ and references/ in the built
+#      tree. Critically, the bare `scripts/foo.py` that follows is relative to
+#      --directory and must be left alone; prefixing it yields a double path.
+#
+#   2. Bare `references/...` paths in prose (references/ai-first-rules.md alone
+#      appears in every command). These are opened directly by the agent, so
+#      they need the platform prefix.
+#
+# Historically only a `.claude/` rule existed here. No command or reference file
+# contains a repo-relative `.claude/` path, so that rule matched nothing and the
+# real paths shipped unrewritten. It is kept below as a cheap safety net.
+
+# Rewrite SKILL_ROOT to the directory holding scripts/ and references/.
+# Pass "." for builds that ship those at the tree root (hermes).
+rewrite_skill_root() {
+  local file="$1" skill_root="$2"
+  [[ -f "$file" ]] || return 0
+  SKILL_ROOT_REPL="$skill_root" perl -i -pe 's{SKILL_ROOT}{$ENV{SKILL_ROOT_REPL}}g' "$file"
+}
+
+# Rewrite directly-named paths so they resolve inside the built tree.
+# Pass an empty platform_dir for builds that ship references/ at the root.
 rewrite_platform_paths() {
   local file="$1" platform_dir="$2"
   [[ -f "$file" ]] || return 0
-  perl -i -pe "s|\\.claude/|.${platform_dir}/|g;" "$file"
+  PLATFORM_DIR="$platform_dir" perl -i -pe '
+    my $d = $ENV{PLATFORM_DIR};
+    next unless length $d;
+    s|\.claude/|.$d/|g;
+    s~(^|[^A-Za-z0-9_./-])\.?/?references/~$1.$d/references/~g;
+  ' "$file"
 }

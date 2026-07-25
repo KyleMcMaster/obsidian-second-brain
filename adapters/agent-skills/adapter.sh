@@ -105,7 +105,11 @@ _ask_emit_skills() {
     } > "$out"
 
     rewrite_tool_neutral "$out"
-    _ask_rewrite_skill_root "$out"
+    rewrite_skill_root "$out" "$ASK_CORE_PATH"
+    # Bare `references/...` paths in command prose resolve against the installed
+    # obsidian-core skill, not the harness CWD. ASK_CORE_PATH already carries the
+    # leading dot, so strip it for the platform-dir argument.
+    rewrite_platform_paths "$out" "${ASK_CORE_PATH#.}"
   done
 }
 
@@ -125,15 +129,6 @@ workspace root so that relative path resolves; if you installed skills globally,
 the absolute path to the installed \`${ASK_CORE}\` directory instead.
 
 EOF
-}
-
-# Rewrite the SKILL_ROOT placeholder (the Claude "Skill root" given at session
-# start) to the installed obsidian-core location. Uses '{}' delimiters so the
-# slashes in the path need no escaping.
-_ask_rewrite_skill_root() {
-  local file="$1"
-  [[ -f "$file" ]] || return 0
-  perl -i -pe "s{SKILL_ROOT}{${ASK_CORE_PATH}}g" "$file"
 }
 
 # Emit the shared obsidian-core skill: a SKILL.md (so skills.sh treats it as an

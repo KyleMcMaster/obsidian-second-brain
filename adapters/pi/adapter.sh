@@ -12,6 +12,7 @@
 
 PI_PLATFORM="pi"
 PI_DIR="pi"
+PI_SKILL_ROOT=".pi/skills/obsidian-second-brain"
 
 adapter_build() {
   local src="$1" dst="$2"
@@ -94,11 +95,14 @@ _pi_command_takes_args() {
 _pi_rewrite_paths_for_prompt() {
   local file="$1"
   [[ -f "$file" ]] || return 0
-  perl -i -pe '
-    s|~/.claude/skills/obsidian-second-brain/|.pi/skills/obsidian-second-brain/|g;
-    s~(^|[^A-Za-z0-9_./-])\.?/?references/~$1.pi/skills/obsidian-second-brain/references/~g;
-    s~(^|[^A-Za-z0-9_./-])\.?/?scripts/(?!build\.sh)~$1.pi/skills/obsidian-second-brain/scripts/~g;
-  ' "$file"
+  # Home-dir install path is pi-specific; the SKILL_ROOT and references/
+  # rewrites are shared (see adapters/lib.sh).
+  perl -i -pe 's|~/.claude/skills/obsidian-second-brain/|'"$PI_SKILL_ROOT"'/|g;' "$file"
+  rewrite_skill_root "$file" "$PI_SKILL_ROOT"
+  rewrite_platform_paths "$file" "${PI_SKILL_ROOT#.}"
+  # NB: `scripts/` is deliberately not rewritten. Every invocation is
+  # `uv run --directory "SKILL_ROOT" scripts/foo.py`, so the path is relative to
+  # --directory. The previous rule prefixed it and produced a double path.
 }
 
 _pi_emit_skill() {
@@ -166,7 +170,7 @@ _pi_copy_references() {
   cp -R "$src/." "$dst/"
   find "$dst" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
     rewrite_tool_neutral "$f"
-    rewrite_platform_paths "$f" "$PI_DIR"
+    rewrite_platform_paths "$f" "${PI_SKILL_ROOT#.}"
   done
 }
 
@@ -175,6 +179,10 @@ _pi_copy_scripts() {
   [[ -d "$src" ]] || return 0
   mkdir -p "$dst"
   cp -R "$src/." "$dst/"
+  # Ship the Python project next to the scripts so `uv run --directory <root>`
+  # can resolve both the module path and its dependencies. Every other adapter
+  # already does this; pi was the one build that shipped scripts with no project.
+  cp "$src/../pyproject.toml" "$(dirname "$dst")/pyproject.toml"
 }
 
 _pi_emit_install_hint() {

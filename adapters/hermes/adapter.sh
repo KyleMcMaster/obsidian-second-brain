@@ -109,7 +109,8 @@ _hermes_emit_skills() {
     } > "$out"
 
     rewrite_tool_neutral "$out"
-    rewrite_platform_paths "$out" "$HERMES_DIR"
+    rewrite_skill_root "$out" "."
+    rewrite_platform_paths "$out" ""
   done
 }
 
@@ -289,7 +290,7 @@ _hermes_copy_references() {
   mkdir -p "$dst"
   cp -R "$src/." "$dst/"
   find "$dst" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-    rewrite_platform_paths "$f" "$HERMES_DIR"
+    rewrite_platform_paths "$f" ""
   done
 }
 
