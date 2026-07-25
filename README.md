@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <strong>One codebase. Six CLIs. Same brain.</strong>
+  <strong>One codebase. Seven CLIs. Same brain.</strong>
 </p>
 
 <p align="center">
@@ -57,7 +57,7 @@
 
 <p align="center">
   <strong>v0.14 - The Harvest (July 2026):</strong> we scanned all 408 forks of this repo and shipped the best ideas back upstream, crediting every author.<br/>
-  <em>Multi-turn /obsidian-brainstorm, bounded vault recall, full-page source reading, Brave + Tavily sources, a guarded updater, supersession-aware search, secret detection, pt-BR triggers - and one Agent Skills build serving Codex, OpenCode, Antigravity, and Copilot CLI (v0.13). 191-test CI wall.</em>
+  <em>Multi-turn /obsidian-brainstorm, bounded vault recall, full-page source reading, Brave + Tavily sources, a guarded updater, supersession-aware search, secret detection, pt-BR triggers - and one Agent Skills build serving Codex, OpenCode, Antigravity, and Copilot CLI (v0.13). 198-test CI wall.</em>
   <a href="CHANGELOG.md">See the changelog &rarr;</a>
 </p>
 
@@ -142,7 +142,7 @@ Karpathy's pattern is brilliant. Drop sources, LLM creates wiki pages, ask quest
 | **New sources** | Append new pages, cross-reference | **Rewrite existing pages.** People get updated, claims revised, stale facts replaced. |
 | **Contradictions** | Flagged, you resolve manually | `/obsidian-reconcile` resolves them automatically |
 | **Patterns** | Surface when you ask | `/obsidian-synthesize` finds unnamed patterns and writes synthesis pages on its own |
-| **When it runs** | On demand, when you prompt | 4 scheduled agents: nightly close, weekly review, contradiction sweep, vault-health check |
+| **When it runs** | On demand, when you prompt | 4 scheduled agents: morning brief, nightly consolidation, weekly review, vault-health check |
 | **Note format** | Human-readable wiki pages | AI-first: `## For future Claude` preamble + frontmatter for LLM retrieval, not human review |
 
 If Karpathy's wiki is a knowledge base you maintain with an LLM, this is a knowledge base that maintains itself.
@@ -227,7 +227,7 @@ Free transcript via youtube-transcript-api. Optional metadata + top comments via
   |                                          |
   +------------------------------------------+
   |                                          |
-  |   LAYER 2: Thinking Tools (8 commands)   |
+  |   LAYER 2: Thinking Tools (9 commands)   |
   |   Claude thinks with you                 |
   |                                          |
   +------------------------------------------+
@@ -523,7 +523,7 @@ Pick your role at bootstrap. Each preset creates tailored folder structures, tem
 | **researcher** | Academics, analysts, deep-divers | Reading / Processing / Synthesized |
 
 ```bash
-python bootstrap_vault.py --path ~/my-vault --name "Your Name" --preset builder
+uv run python scripts/bootstrap_vault.py --path ~/my-vault --name "Your Name" --preset builder
 ```
 
 No preset? You get a general-purpose vault that works for everyone.
@@ -586,7 +586,7 @@ vault/
 
 > **One codebase, seven builds.** Pick yours below. The vault behavior is identical across all of them; only the install path and the dispatcher file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `.agents/skills/` / `.pi/`) differ.
 
-**Prerequisites:** [Claude Code](https://claude.com/claude-code) (or one of the other five platforms below), `git`, and [`uv`](https://docs.astral.sh/uv/) for the Python helpers (health check, research toolkit, bootstrap). Optional: `jq` (used by `setup.sh`), [Ollama](https://ollama.com) for local semantic search. No API keys needed for the core vault commands.
+**Prerequisites:** [Claude Code](https://claude.com/claude-code) (or one of the other six platforms below), `git`, and [`uv`](https://docs.astral.sh/uv/) for the Python helpers (health check, research toolkit, bootstrap). Optional: `jq` (used by `setup.sh`), [Ollama](https://ollama.com) for local semantic search. No API keys needed for the core vault commands.
 
 ### Claude Code (default)
 
@@ -637,7 +637,7 @@ Then open Claude Code and run `/obsidian-init` inside your vault.
 git clone https://github.com/eugeniughelbur/obsidian-second-brain
 cd obsidian-second-brain
 bash scripts/build.sh --platform codex-cli   # or gemini-cli, or opencode
-cp -R dist/codex-cli/. /path/to/your/vault/   # or .gemini-cli / .opencode/
+cp -R dist/codex-cli/. /path/to/your/vault/   # or dist/gemini-cli/. or dist/opencode/.
 ```
 
 Then start your CLI from the vault root.
@@ -737,7 +737,7 @@ Keys you need:
 | `YOUTUBE_API_KEY` | [console.cloud.google.com](https://console.cloud.google.com) | `/youtube` metadata + comments (optional, transcripts free without) | Free tier 10k units/day |
 | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/api-keys) | `/podcast` Whisper transcription (optional, falls back to show-notes if unset) | ~$0.006/min |
 
-Without keys, the 37 non-research commands work fully, and `/research` + `/research-deep` fall back to free, key-less sources. The rest of the research toolkit degrades gracefully.
+Without keys, the 38 non-research commands work fully, and `/research` + `/research-deep` fall back to free, key-less sources. The rest of the research toolkit degrades gracefully.
 
 ### Semantic search (optional, off by default)
 
@@ -764,7 +764,7 @@ This is a Claude Code skill, not an Obsidian plugin. An Obsidian plugin lives in
 An Obsidian plugin runs inside Obsidian and is written in TypeScript against Obsidian's plugin API. A Claude Code skill for Obsidian runs inside Claude Code and is written as a set of markdown command files plus optional Python scripts. Plugins are constrained to what Obsidian's API exposes. Skills are constrained only by what Claude can do in your shell, which is why this skill can do things plugins can't: pull live web research into vault notes, run scheduled agents that update your vault while you sleep, and synthesize knowledge across years of notes using Anthropic's Claude.
 
 ### How do I add this Obsidian Claude skill to Claude Code?
-Run the one-line installer from the Install section below. It clones the repo to `~/.claude/skills/obsidian-second-brain` and symlinks the slash commands into `~/.claude/commands/` so Claude Code picks them up automatically. Restart Claude Code after install. The skill loads on every session that touches an Obsidian vault.
+Run the one-line installer from the [Install](#install) section above. It clones the repo to `~/.claude/skills/obsidian-second-brain` and symlinks the slash commands into `~/.claude/commands/` so Claude Code picks them up automatically. Restart Claude Code after install. The skill loads on every session that touches an Obsidian vault.
 
 ### Does this work with Codex CLI, Gemini CLI, or OpenCode?
 Yes. The repo ships a build script that compiles the platform-neutral source into seven platform-specific outputs: Claude Code (slash commands + `CLAUDE.md`), Codex CLI (native Agent Skills), Gemini CLI (`GEMINI.md` + `.gemini/commands/`), OpenCode (`AGENTS.md` + `.opencode/commands/`), Hermes (native skills), Pi (`package.json` + `.pi/`), and a unified Agent Skills build (one `.agents/skills/` tree for Antigravity / Codex / OpenCode / GitHub Copilot CLI and any other Agent Skills harness). Run `bash scripts/build.sh --platform codex-cli` (or another platform name), then copy the resulting `dist/<platform>/` tree into your vault. The non-Claude builds either emit native skills or auto-generate a routing table that maps natural-language triggers to command files, so the same 44 cross-platform commands work no matter which CLI you use (the calendar command is Claude Code only, since it depends on the Google Calendar MCP). The vault rules (AI-first notes, frontmatter, wikilinks, recency markers) are identical across every platform.
