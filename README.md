@@ -23,7 +23,7 @@
   <a href="https://github.com/sponsors/eugeniughelbur"><img src="https://img.shields.io/badge/Sponsor-EA4AAA?style=for-the-badge&logo=github-sponsors&logoColor=white" alt="Sponsor" /></a>
 </p>
 
-<h1 align="center">obsidian-second-brain</h1>
+<h1 align="center">obsidian-second-brain: an AI second brain for Obsidian that Claude can actually search</h1>
 
 <p align="center">
   <strong>An evolution of <a href="https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f">Karpathy's LLM Wiki pattern</a>: a vault that rewrites itself.</strong>
@@ -53,6 +53,8 @@
   </a>
   <br />
   <em>One <code>/obsidian-save</code> - five cross-linked notes. Real footage, synthetic vault. <a href="DEMOS.md">More demos &rarr;</a></em>
+  <br /><br />
+  <em>If this looks useful, <a href="https://github.com/eugeniughelbur/obsidian-second-brain/stargazers">star the repo</a>. It is how other people find it.</em>
 </p>
 
 <p align="center">
@@ -620,6 +622,8 @@ git clone https://github.com/eugeniughelbur/obsidian-second-brain ~/.claude/skil
 bash ~/.claude/skills/obsidian-second-brain/install.sh
 bash ~/.claude/skills/obsidian-second-brain/scripts/setup.sh "/path/to/your/vault"
 ```
+
+> Cloning it? A [star](https://github.com/eugeniughelbur/obsidian-second-brain/stargazers) costs you nothing and is how the next person finds this.
 
 **No vault yet?** Create a ready-to-use one first (folders, templates, boards, dashboards - passes its own health check out of the box):
 
