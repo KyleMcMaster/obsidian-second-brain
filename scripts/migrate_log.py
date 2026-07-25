@@ -123,7 +123,10 @@ def split_log(text: str) -> dict[str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--vault", required=True, type=Path, help="Path to vault root")
+    # --path is the convention across every other script; accept both so a
+    # wrapper passing --path does not break silently on this one.
+    ap.add_argument("--vault", "--path", dest="vault", required=True, type=Path,
+                    help="Path to vault root")
     ap.add_argument("--dry-run", action="store_true", help="Print actions without writing")
     args = ap.parse_args()
 

@@ -60,8 +60,12 @@ CODE_FENCE_WRAP_RE = re.compile(r"\A\s*```[^\n]*\n\s*---\s*\n")
 LINK_RE = re.compile(r"\[\[([^\]|#]+)(?:[|#][^\]]*)?\]\]")
 DATE_RE = re.compile(r"due:\s*(\d{4}-\d{2}-\d{2})")
 TEMPLATE_RE = re.compile(r"<%.*?%>")
-ALIAS_RE = re.compile(r"^aliases:\s*\n((?:\s+-\s+.+\n?)+)", re.MULTILINE)
-ALIAS_ITEM_RE = re.compile(r"^\s+-\s+(.+)$", re.MULTILINE)
+# `\s*-\s*`, not `\s+-\s+`: a list written with the dash at column 0, or with
+# no space after it, is valid YAML. Requiring surrounding whitespace made those
+# aliases invisible here while link_graph (which uses `\s*`) resolved them, so
+# the same note was an orphan to one tool and linked to the other.
+ALIAS_RE = re.compile(r"^aliases:\s*\n((?:\s*-\s*.+\n?)+)", re.MULTILINE)
+ALIAS_ITEM_RE = re.compile(r"^\s*-\s*(.+)$", re.MULTILINE)
 ALIAS_INLINE_RE = re.compile(r"^aliases:\s*\[(.+)\]\s*$", re.MULTILINE)
 
 

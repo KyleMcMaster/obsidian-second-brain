@@ -25,6 +25,7 @@ Usage:
 import argparse
 import html
 import os
+import unicodedata
 import re
 import sys
 import datetime
@@ -135,7 +136,18 @@ def infer_type(fm, rel):
 _YAML_LEAD = set("&*@`!|>%?:#-[]{},\"'")
 
 
-def yaml_val(v):
+def _nfc(s: str) -> str:
+    """Canonical Unicode form, matching vault_health._nfc.
+
+    macOS stores filenames decomposed while a typed wikilink is usually
+    composed, so without this an accented title never matched and the link
+    silently degraded to plain text in the exported bundle. Same defect PR #161
+    fixed in vault_health and link_graph.
+    """
+    return unicodedata.normalize("NFC", s)
+
+
+def yaml_val(v, *, flow: bool = False):
     """Render a value for OKF frontmatter (lists inline, strings quoted if needed).
 
     Quotes (and fully escapes) any scalar that YAML would otherwise misparse:
@@ -143,11 +155,21 @@ def yaml_val(v):
     leading YAML indicator char (e.g. `@sentropic/...`, `&gt; ...`). In the quoted
     branch backslashes are escaped BEFORE quotes, so source `\\(` / `\\"` from
     markdown-escaped links stay valid inside a double-quoted YAML scalar.
+
+    `flow=True` marks a value being emitted inside a `[...]` sequence, where `,`
+    and `]` are structural. A tag like "a, b" is a perfectly safe block scalar
+    but splits into two items inside a flow sequence, so it needs quoting there
+    and only there.
     """
     if isinstance(v, list):
-        return "[" + ", ".join(str(x) for x in v) + "]"
+        # Recurse per item rather than joining raw str(). Unquoted items meant a
+        # tag containing a comma split in two, one containing a colon became a
+        # nested mapping, and a leading '#' truncated the sequence into a parse
+        # error - so the bundle failed to load in the agents OKF exists to serve.
+        return "[" + ", ".join(yaml_val(x, flow=True) for x in v) + "]"
     s = str(v)
-    if s == "" or s != s.strip() or (s[0] in _YAML_LEAD) or any(c in s for c in ':#"'):
+    unsafe = ':#"' + (",]" if flow else "")
+    if s == "" or s != s.strip() or (s[0] in _YAML_LEAD) or any(c in s for c in unsafe):
         return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return s
 
@@ -192,10 +214,10 @@ def main():
     name_to_rel = {}
     for rel in notes:
         stem = pathlib.PurePath(rel).stem
-        name_to_rel.setdefault(stem.lower(), rel)
+        name_to_rel.setdefault(_nfc(stem).lower(), rel)
         fm = notes[rel][1]
         for a in (fm.get("aliases") or []):
-            name_to_rel.setdefault(str(a).lower(), rel)
+            name_to_rel.setdefault(_nfc(str(a)).lower(), rel)
 
     # 2b) index real non-note vault files (pdf, png, canvas, ...) so links to
     # them export as links, exactly like embeds already do, instead of silently
@@ -225,14 +247,14 @@ def main():
             embed, inner = m.group(1), m.group(2)
             target = inner.split("|", 1)[0].split("#", 1)[0].strip()
             display = inner.split("|", 1)[1].strip() if "|" in inner else target
-            tgt_rel = name_to_rel.get(_link_name(target).lower())
+            tgt_rel = name_to_rel.get(_nfc(_link_name(target)).lower())
             if tgt_rel:
                 relpath = os.path.relpath(tgt_rel, from_dir) if str(from_dir) != "." else tgt_rel
                 relpath = relpath.replace(os.sep, "/")
                 href = f"<{relpath}>" if " " in relpath else relpath
                 return f"![{display}]({href})" if embed else f"[{display}]({href})"
             # a real vault file (asset) that just isn't a note: keep the link
-            asset_rel = asset_to_rel.get(target.lower())
+            asset_rel = asset_to_rel.get(_nfc(target).lower())
             if asset_rel:
                 href = f"<{asset_rel}>" if " " in asset_rel else asset_rel
                 return f"![{display}]({href})" if embed else f"[{display}]({href})"
