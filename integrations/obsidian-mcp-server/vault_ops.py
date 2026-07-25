@@ -15,6 +15,7 @@ import math
 import os
 import re
 import sys
+import unicodedata
 import urllib.request
 from datetime import datetime
 from pathlib import Path, PurePosixPath
@@ -33,6 +34,12 @@ _NOTES_DIR = "Inbox"
 # all search the same universe (stress-test fix 10/24).
 _SKIP_DIRS = {".obsidian", ".git", ".trash", "_trash", ".claude", "_export",
               "templates", "node_modules"}
+
+# Directories no write tool may touch. `raw/` holds original sources the skill
+# treats as immutable, and `templates` needs to match the conventional capital-T
+# `Templates/` a bootstrapped vault actually creates - the old guard compared a
+# lowercase set against un-lowercased path parts, so it never matched.
+_PROTECTED_WRITE_DIRS = _SKIP_DIRS | {"raw"}
 
 # Operational logs and immutable raw sources are rarely the *answer* to a query:
 # they are long and term-dense, so without a penalty they dominate term-frequency
@@ -493,8 +500,8 @@ def read_note(rel: str) -> Dict[str, Any]:
     rel = (rel or "").strip()
     if not rel:
         return {"error": "path is required"}
-    target = (vault / rel).resolve()
-    if vault != target and vault not in target.parents:
+    target = _resolve_in_vault(vault, rel)
+    if target is None:
         return {"error": "path is outside the vault"}
     text = _read_safe(target)
     if text is None:
@@ -536,7 +543,17 @@ def save_note(
         f"{preamble}\n\n"
         f"{content}\n"
     )
-    path.write_text(body, encoding="utf-8")
+    # B7: the filename is date + slug, so a second save with the same title on
+    # the same day used to overwrite the first with no error and no backup.
+    # Refuse and point at the tool that can actually edit an existing note.
+    if path.exists():
+        return {
+            "error": (
+                f"a note already exists at {path.relative_to(vault).as_posix()}; "
+                "use obsidian_update_note to append to it, or save under a different title"
+            )
+        }
+    _write_atomic(path, body)
     return {"saved": path.relative_to(vault).as_posix()}
 
 
@@ -568,10 +585,10 @@ def update_note(
     rel = (rel or "").strip()
     if not rel:
         return {"error": "path is required"}
-    target = (vault / rel).resolve()
-    if vault != target and vault not in target.parents:
+    target = _resolve_in_vault(vault, rel)
+    if target is None:
         return {"error": "path is outside the vault"}
-    if set(target.relative_to(vault).parts) & _SKIP_DIRS:
+    if {p.lower() for p in target.relative_to(vault).parts} & _PROTECTED_WRITE_DIRS:
         return {"error": "path is in a protected directory"}
     text = _read_safe(target)
     if text is None:
@@ -593,7 +610,7 @@ def update_note(
             new_body = new_body.rstrip() + f"\n\n{section}\n"
 
     out = "---\n" + "\n".join(fm_lines).strip("\n") + "\n---\n\n" + new_body.lstrip("\n")
-    target.write_text(out, encoding="utf-8")
+    _write_atomic(target, out)
     return {"updated": rel, "set": sorted(fields.keys()), "appended": bool(append)}
 
 
@@ -608,8 +625,8 @@ def validate_note(rel: str) -> Dict[str, Any]:
     rel = (rel or "").strip()
     if not rel:
         return {"error": "path is required"}
-    target = (vault / rel).resolve()
-    if vault != target and vault not in target.parents:
+    target = _resolve_in_vault(vault, rel)
+    if target is None:
         return {"error": "path is outside the vault"}
     text = _read_safe(target)
     if text is None:
@@ -833,11 +850,57 @@ def _snippet(text: str, terms: List[str]) -> str:
     return text[start : start + _SNIPPET_CHARS].replace("\n", " ").strip()
 
 
+def _write_atomic(path: Path, text: str) -> None:
+    """Write via temp file + os.replace, preserving the target's mode.
+
+    Both write paths here run over a live MCP connection, so a client timeout or
+    a crash mid-write would otherwise leave a half-written note with no backup.
+    Mirrors scripts/note_io.write_exact, which the vault scripts already use.
+    """
+    import os as _os
+    import tempfile
+    keep_mode = None
+    try:
+        keep_mode = path.stat().st_mode
+    except OSError:
+        pass
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".{}.".format(path.name), suffix=".tmp")
+    try:
+        with _os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
+        if keep_mode is not None:
+            _os.chmod(tmp, keep_mode)
+        _os.replace(tmp, path)
+    except BaseException:
+        try:
+            _os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def _resolve_in_vault(vault: Path, rel: str) -> Optional[Path]:
+    """Resolve a vault-relative path, refusing anything that escapes the vault.
+
+    A security boundary, so it lives in exactly one place. It was previously
+    inlined identically in read_note, update_note, and validate_note; the next
+    tool to forget a line would have reintroduced traversal silently.
+    """
+    target = (vault / rel).resolve()
+    if vault != target and vault not in target.parents:
+        return None
+    return target
+
+
 def _read_safe(path: Path, *, limit: int = 4_000_000) -> Optional[str]:
+    # utf-8-sig, matching every sibling reader (vault_health, vault_stats,
+    # link_graph, export_okf). Plain utf-8 leaves a BOM glued to the first line,
+    # which breaks frontmatter detection and shows up in every snippet this
+    # server surfaces. Windows editors and several sync tools emit BOMs.
     try:
         if not path.is_file():
             return None
-        return path.read_text(encoding="utf-8", errors="replace")[:limit]
+        return path.read_text(encoding="utf-8-sig", errors="replace")[:limit]
     except OSError:
         return None
 
@@ -856,9 +919,20 @@ def _wikilinks(text: str) -> List[str]:
     return [m.group(1).strip() for m in _WIKILINK_RE.finditer(text)]
 
 
+def _nfc(s: str) -> str:
+    """Canonical Unicode form, matching vault_health._nfc.
+
+    macOS stores filenames decomposed (NFD) while a typed wikilink is usually
+    composed (NFC), so an accented title compares unequal without this and the
+    note is reported as a false orphan. Fixed in vault_health and link_graph by
+    PR #161; this server had the same gap.
+    """
+    return unicodedata.normalize("NFC", s)
+
+
 def _norm_link(link: str) -> str:
     """Normalize a wikilink target to a comparable note stem (basename, lowercased)."""
-    return link.split("/")[-1].strip().lower()
+    return _nfc(link.split("/")[-1].strip()).lower()
 
 
 def _stem_index(vault: Path) -> Dict[str, str]:
@@ -867,7 +941,7 @@ def _stem_index(vault: Path) -> Dict[str, str]:
     for i, md in enumerate(_iter_notes(vault)):
         if i >= _MAX_FILES_SCANNED:
             break
-        idx[md.stem.lower()] = str(md.relative_to(vault))
+        idx[_nfc(md.stem).lower()] = str(md.relative_to(vault))
     return idx
 
 
