@@ -157,7 +157,7 @@ If Karpathy's wiki is a knowledge base you maintain with an LLM, this is a knowl
 Claude pulls out every decision, person, task, and idea and saves each one to the right note. You do nothing.
 
 **You recorded a voice memo:** `/obsidian-ingest meeting.m4a`
-Claude transcribes it with Whisper, identifies speakers, extracts every promise and action item, and distributes across entity pages, task boards, and the daily note.
+Claude transcribes it with a local Whisper install, attributes speakers where the transcript makes them identifiable, extracts every promise and action item, and distributes across entity pages, task boards, and the daily note.
 
 **You screenshot a whiteboard:** `/obsidian-ingest photo.png`
 Claude reads the image, extracts text and structure, creates concept notes, links to related projects. A photo becomes knowledge.
@@ -509,7 +509,7 @@ This vault rewrites itself with every input:
 
 The vault after a week is fundamentally different from the vault you started with.
 
-**The maintenance layer has a name: OKM (Open Knowledge Metabolism).** Storage is the easy half; keeping stored knowledge *true* is the hard half, and it is where this project spends its effort. OKM is the open standard behind that: **every stored fact must be timeless, dated, or a pointer.** Slow-changing knowledge (how things work, decisions, ownership) is stored; fast-changing facts (counts, statuses, balances) are linked to where they live with an `as of` stamp, never copied in to rot. The rule is a one-page spec ([references/freshness-policy.md](references/freshness-policy.md)), enforced by a linter ([scripts/freshness_lint.py](scripts/freshness_lint.py)) that `/obsidian-health` runs. Where OKF (Google's Open Knowledge Format) standardizes how agent knowledge is *written*, OKM standardizes how it *stays true* - the metabolism to OKF's format. It is storage-agnostic: any folder of markdown an AI maintains, not just Obsidian vaults.
+**The maintenance layer has a name: OKM (Open Knowledge Metabolism).** Storage is the easy half; keeping stored knowledge *true* is the hard half, and it is where this project spends its effort. OKM is the open spec behind that: **every stored fact must be timeless, dated, or a pointer.** Slow-changing knowledge (how things work, decisions, ownership) is stored; fast-changing facts (counts, statuses, balances) are linked to where they live with an `as of` stamp, never copied in to rot. The rule is a one-page spec ([references/freshness-policy.md](references/freshness-policy.md)), enforced by a linter ([scripts/freshness_lint.py](scripts/freshness_lint.py)) that `/obsidian-health` runs. Where OKF (Google's Open Knowledge Format) standardizes how agent knowledge is *written*, OKM is a companion spec for keeping it *true* - the metabolism to OKF's format. One spec, one reference linter, no second implementation yet. It is storage-agnostic: any folder of markdown an AI maintains, not just Obsidian vaults.
 
 ---
 
@@ -539,6 +539,8 @@ No preset? You get a general-purpose vault that works for everyone.
 ```
 PostCompact -> obsidian-bg-agent.sh -> claude -p (headless) -> vault updated
 ```
+
+**What arming it costs.** The headless run uses `--dangerously-skip-permissions`, because nobody is there to approve each write. That is why the agent ships inert and stays opt-in. Its tool surface is pinned to `Read,Write,Edit,Glob,Grep`, so it cannot run shell commands or reach the network, and it only adds and updates - it never deletes or merges. If that trade is not one you want, leave it off; every other command works without it.
 
 **Scheduled:**
 
@@ -588,7 +590,7 @@ vault/
 
 > **One codebase, seven builds.** Pick yours below. The vault behavior is identical across all of them; only the install path and the dispatcher file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `.agents/skills/` / `.pi/`) differ.
 
-**Prerequisites:** [Claude Code](https://claude.com/claude-code) (or one of the other six platforms below), `git`, and [`uv`](https://docs.astral.sh/uv/) for the Python helpers (health check, research toolkit, bootstrap). Optional: `jq` (used by `setup.sh`), [Ollama](https://ollama.com) for local semantic search. No API keys needed for the core vault commands.
+**Prerequisites:** [Claude Code](https://claude.com/claude-code) (or one of the other six platforms below), `git`, and [`uv`](https://docs.astral.sh/uv/) for the Python helpers (health check, research toolkit, bootstrap). Optional: `jq` (used by `setup.sh`), [Ollama](https://ollama.com) for local semantic search, `openai-whisper` (installed on first audio ingest, pulls in PyTorch). No API keys needed for the core vault commands.
 
 ### Claude Code (default)
 
@@ -745,7 +747,7 @@ Without keys, the 38 non-research commands work fully, and `/research` + `/resea
 
 ### Semantic search (optional, off by default)
 
-Search (`/obsidian-find` and the MCP connector) works out of the box as fast keyword search - **no setup, no model, nothing to install.** You can optionally add a meaning-based layer that finds notes even when your query shares no words with them. It is opt-in by setup and, when present, leads the ranking with keyword search as tiebreak and freshness signals on top (measured on a ~2,350-note vault: keyword recall@10 1.0, paraphrased-question recall@10 77%, and non-English queries went from ~0 to 63% recall@5 with the multilingual default model - full reference in scripts/eval/BASELINE.md). If the model is ever unreachable, search silently falls back to keyword - it never breaks or hangs.
+Search (`/obsidian-find` and the MCP connector) works out of the box as fast keyword search - **no setup, no model, nothing to install.** You can optionally add a meaning-based layer that finds notes even when your query shares no words with them. It is opt-in by setup and, when present, leads the ranking with keyword search as tiebreak and freshness signals on top (measured on a ~2,350-note vault: keyword recall@10 1.0, paraphrased-question recall@10 77%, and non-English queries went from 13% to 63% recall@5, a 5x gain, with the multilingual default model - full reference in scripts/eval/BASELINE.md). If the model is ever unreachable, search silently falls back to keyword - it never breaks or hangs.
 
 Two ways to provide the embedding model:
 

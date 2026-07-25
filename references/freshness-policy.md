@@ -1,6 +1,6 @@
 # The freshness policy
 
-> Part of **OKM - Open Knowledge Metabolism**, an open standard for keeping AI-maintained knowledge folders true, by Eugeniu Ghelbur (theaioperator.io). MIT-licensed. Where OKF (Open Knowledge Format) standardizes how agent knowledge is written, OKM standardizes how it stays true.
+> Part of **OKM - Open Knowledge Metabolism**, an open spec for keeping AI-maintained knowledge folders true, by Eugeniu Ghelbur (theaioperator.io). MIT-licensed. Where OKF (Open Knowledge Format) standardizes how agent knowledge is written, OKM is a companion spec for keeping it true.
 
 One rule, enforced by a lint: **every stored fact must be timeless, dated, or a pointer. Nothing may claim to be current without a stamp.**
 
