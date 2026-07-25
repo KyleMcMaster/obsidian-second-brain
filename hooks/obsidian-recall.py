@@ -69,7 +69,11 @@ def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "integrations" / "obsidian-mcp-server"))
     import vault_ops  # noqa: E402
 
-    results = vault_ops.search(prompt, limit=MAX_NOTES)
+    # Lexical only. This hook fires on EVERY prompt, and the semantic arm costs
+    # 11-12s against a ~2,900-note vault (measured 2026-07-25) versus 1.4s lexical.
+    # A bounded recall brief that abstains on weak matches does not need semantic
+    # ranking; paying 12s per message for it is not a trade worth making.
+    results = vault_ops.search(prompt, limit=MAX_NOTES, semantic=False)
     if not results:
         _log(vault, {"prompt_chars": len(prompt), "abstained": True, "reason": "no results"})
         return 0
