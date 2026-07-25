@@ -79,11 +79,16 @@ def test_build_emits_a_non_empty_tree(built: Path, platform: str) -> None:
 @pytest.mark.parametrize("platform", PLATFORMS)
 def test_skill_root_placeholder_is_resolved(built: Path, platform: str) -> None:
     """SKILL_ROOT must be rewritten to a real path on every harness that does not
-    supply one. Shipping the literal string breaks every Python-backed command."""
+    supply one. Shipping the literal string breaks every Python-backed command.
+
+    Scoped to markdown, because markdown is what the agent reads as instructions.
+    Python sources under scripts/ are shipped verbatim and may legitimately name
+    the placeholder in a comment; scripts/conformance_report.py does exactly
+    that, and an all-files scan flagged the checker's own source as a defect."""
     offenders = [
         p.relative_to(built).as_posix()
-        for p in (built / platform).rglob("*")
-        if p.is_file() and "SKILL_ROOT" in p.read_text(encoding="utf-8", errors="ignore")
+        for p in (built / platform).rglob("*.md")
+        if "SKILL_ROOT" in p.read_text(encoding="utf-8", errors="ignore")
     ]
 
     if platform in SKILL_ROOT_EXEMPT:
