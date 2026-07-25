@@ -1,6 +1,6 @@
 {
   "name": "obsidian-second-brain",
-  "description": "Operate any Obsidian vault as a living, AI-first second brain: 45 slash commands across vault management, thinking tools, a research toolkit, and scheduled agents.",
+  "description": "Stop re-explaining your notes to Claude. Turns your Obsidian vault into memory Claude can actually search, and keeps it true: new sources rewrite existing pages, contradictions reconcile, and stale facts get flagged. AI note-taking and PKM for Claude Code.",
   "version": "0.14.0",
   "author": {
     "name": "Eugeniu Ghelbur",
