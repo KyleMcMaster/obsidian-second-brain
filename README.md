@@ -590,7 +590,7 @@ vault/
 
 > **One codebase, seven builds.** Pick yours below. The vault behavior is identical across all of them; only the install path and the dispatcher file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `.agents/skills/` / `.pi/`) differ.
 
-**Prerequisites:** [Claude Code](https://claude.com/claude-code) (or one of the other six platforms below), `git`, and [`uv`](https://docs.astral.sh/uv/) for the Python helpers (health check, research toolkit, bootstrap). Optional: `jq` (used by `setup.sh`), [Ollama](https://ollama.com) for local semantic search, `openai-whisper` (installed on first audio ingest, pulls in PyTorch). No API keys needed for the core vault commands.
+**Prerequisites:** [Claude Code](https://claude.com/claude-code) (or one of the other six platforms below), `git`, and [`uv`](https://docs.astral.sh/uv/) for the Python helpers (health check, research toolkit, bootstrap). `jq` is **required for the classic script install** - `scripts/setup.sh` uses it to edit `~/.claude/settings.json` safely and exits if it is missing. Not needed on the plugin path. Optional: [Ollama](https://ollama.com) for local semantic search, `openai-whisper` (installed on first audio ingest, pulls in PyTorch). No API keys needed for the core vault commands.
 
 ### Claude Code (default)
 
@@ -638,6 +638,8 @@ bash scripts/setup.sh ~/Documents/MyVault
 Then open Claude Code and run `/obsidian-init` inside your vault.
 
 ### Codex CLI / Gemini CLI / OpenCode
+
+> **Codex and OpenCode users: prefer the [Agent Skills build](#google-antigravity-and-any-agentsskills-harness) below.** The standalone `codex-cli` and `opencode` builds are deprecated and superseded by it; both print that notice in their own `INSTALL.md`. They still work, and will until they are removed. Gemini CLI has no replacement build, so this is the right path there.
 
 ```bash
 git clone https://github.com/eugeniughelbur/obsidian-second-brain
@@ -723,7 +725,18 @@ What to expect (open models follow instructions less reliably than Claude, so th
 
 ### Research toolkit (optional)
 
-The 7 research commands use API keys (2 of them fall back to free sources without any). Run `install.sh` and answer "y" to the research prompt. That sets up `~/.config/obsidian-second-brain/.env`. Or do it manually:
+The 7 research commands use API keys (2 of them fall back to free sources without any).
+
+**Installed the plugin?** You have no repo checkout, so `install.sh`, `.env.example`, and `uv sync` are not on your disk. Create the env file by hand instead - the research scripts read this path regardless of how you installed, and the plugin's MCP server already runs under `uv run --with mcp`, so there is nothing to `uv sync`:
+
+```bash
+mkdir -p ~/.config/obsidian-second-brain
+touch ~/.config/obsidian-second-brain/.env
+chmod 600 ~/.config/obsidian-second-brain/.env
+# then paste the keys from the table below into that file
+```
+
+**Installed from a clone?** Run `install.sh` and answer "y" to the research prompt, which does the same thing for you. Or do it manually:
 
 ```bash
 mkdir -p ~/.config/obsidian-second-brain

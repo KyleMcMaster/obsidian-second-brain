@@ -685,6 +685,24 @@ A single ingest should touch 5-15 files. Compile knowledge once, distribute ever
 
 ---
 
+### `/obsidian-decide [topic] [--formal]`
+
+**Records decisions at two depths.** Default mode captures the decisions made in a conversation as dated one-liners appended to the relevant project notes' `## Key Decisions` sections (and the daily note) - for the steady stream of choices made while working. `--formal` (or leading with `adr`) instead writes one full Architecture Decision Record - Decision / Context / Options Considered / Rationale / Consequences / Related - to the decisions folder (resolved per `references/folder-map.md`: wiki-style `wiki/decisions/`, Obsidian-style `Knowledge/`), links it from the project's Key Decisions and `index.md`, and logs it. Use the formal mode for a structural or directional decision worth a real writeup; `python scripts/mine_commit_decisions.py` surfaces decision-shaped commits as ADR candidates.
+
+The vault knows why it's structured the way it is - when a future session asks "why?", the formal record answers. `/obsidian-graduate`, `/obsidian-health` structural fixes, and folder reorganizations may offer to write a formal record; they offer, they don't force.
+
+(Consolidated: the former standalone `/obsidian-adr` is now `/obsidian-decide --formal`; its triggers still route here.)
+
+---
+
+### `/obsidian-learn [recent|all|topic]`
+
+**Reviews the lessons scattered across the vault and turns them into a living rulebook.**
+
+Scans daily notes, dev logs, ADRs, and auto-generated pattern reports for lessons, mistakes, and wins, then classifies each as active, stale, superseded, or a promotion candidate (appeared 3+ times - worth becoming a permanent rule in `_CLAUDE.md`). Default scope is the last 30 days (`all` for the whole vault, or a named topic). Writes a Learnings Review to `wiki/concepts/YYYY-MM-DD - Learnings Review.md` and offers to promote candidates or archive stale lessons with confirmation. Lessons that are not reviewed do not compound.
+
+---
+
 ## Thinking Tools
 
 These commands use the vault as a thinking partner - not just storage. They surface insights, challenge assumptions, and generate connections that the user cannot see on their own.
@@ -823,14 +841,6 @@ Answers "what is worth doing next" from vault material. Distinct from `/obsidian
 
 ---
 
-### `/obsidian-learn [recent|all|topic]`
-
-**Reviews the lessons scattered across the vault and turns them into a living rulebook.**
-
-Scans daily notes, dev logs, ADRs, and auto-generated pattern reports for lessons, mistakes, and wins, then classifies each as active, stale, superseded, or a promotion candidate (appeared 3+ times - worth becoming a permanent rule in `_CLAUDE.md`). Default scope is the last 30 days (`all` for the whole vault, or a named topic). Writes a Learnings Review to `wiki/concepts/YYYY-MM-DD - Learnings Review.md` and offers to promote candidates or archive stale lessons with confirmation. Lessons that are not reviewed do not compound.
-
----
-
 ## Context Engine
 
 ### `/obsidian-world`
@@ -859,21 +869,11 @@ If `index.md` doesn't exist, offer to run `/obsidian-init` to generate it.
 
 ---
 
-### `/obsidian-decide [topic] [--formal]`
-
-**Records decisions at two depths.** Default mode captures the decisions made in a conversation as dated one-liners appended to the relevant project notes' `## Key Decisions` sections (and the daily note) - for the steady stream of choices made while working. `--formal` (or leading with `adr`) instead writes one full Architecture Decision Record - Decision / Context / Options Considered / Rationale / Consequences / Related - to the decisions folder (resolved per `references/folder-map.md`: wiki-style `wiki/decisions/`, Obsidian-style `Knowledge/`), links it from the project's Key Decisions and `index.md`, and logs it. Use the formal mode for a structural or directional decision worth a real writeup; `python scripts/mine_commit_decisions.py` surfaces decision-shaped commits as ADR candidates.
-
-The vault knows why it's structured the way it is - when a future session asks "why?", the formal record answers. `/obsidian-graduate`, `/obsidian-health` structural fixes, and folder reorganizations may offer to write a formal record; they offer, they don't force.
-
-(Consolidated: the former standalone `/obsidian-adr` is now `/obsidian-decide --formal`; its triggers still route here.)
-
----
-
 ## Research Commands
 
 Seven commands that pull external knowledge into the vault - X posts, X discourse, web research with citations, vault-grounded synthesis, YouTube videos, and podcast episodes (plus `/obsidian-ingest` above for arbitrary URLs, PDFs, audio, and screenshots). All output AI-first notes per the vault's Section 0 rule (preamble, rich frontmatter, recency markers, mandatory wikilinks, sources verbatim).
 
-**Setup:** API keys live at `~/.config/obsidian-second-brain/.env`. Run `install.sh` and answer "y" to the research toolkit prompt, or copy `.env.example` manually. xAI Grok and Perplexity keys are required; YouTube key is optional (transcripts work without it).
+**Setup:** API keys live at `~/.config/obsidian-second-brain/.env`. Run `install.sh` and answer "y" to the research toolkit prompt, or copy `.env.example` manually. The xAI Grok key is required for `/x-read` and `/x-pulse`. Perplexity is optional: with no `PERPLEXITY_API_KEY` set, `/research` and `/research-deep` fall back to free key-less sources automatically, and `--free` forces that path even when a key exists (`--academic` restricts it to scholarly sources). YouTube key is optional; transcripts work without it. Never tell a user a research command is unavailable because they lack a Perplexity key.
 
 **Stack:** Python 3.10+ with `uv`. Install deps via `uv sync` from the repo root.
 
@@ -1004,7 +1004,6 @@ Spotify URLs are not supported (DRM blocks audio + transcript access). If no tra
 uv run python -c "from scripts.research.lib.usage import month_total; t,c = month_total(); print(f'\${t:.2f} across {c} calls')"
 ```
 
-No usage tracking on Perplexity calls (intentional - user opted out).
 
 No hard caps. No blocking. No per-call confirmation prompts. Trust the user to monitor.
 
