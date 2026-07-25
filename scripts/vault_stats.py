@@ -220,7 +220,10 @@ def update_index(vault: Path, block: str) -> bool:
         re.DOTALL,
     )
     if pattern.search(text):
-        new_text = pattern.sub(block, text)
+        # A lambda, not a string: as a string, re.sub interprets backslash
+        # escapes, so a frontmatter value containing \p aborts the run with
+        # `bad escape` and one containing \1 silently injects a group.
+        new_text = pattern.sub(lambda _m: block, text)
     else:
         # Append block if markers are absent (first run on a vault that doesn't yet have them)
         new_text = text.rstrip() + "\n\n" + block + "\n"

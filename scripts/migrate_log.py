@@ -135,7 +135,7 @@ def main() -> int:
         print(f"error: {log_path} not found", file=sys.stderr)
         return 1
 
-    text = log_path.read_text(encoding="utf-8")
+    text = log_path.read_text(encoding="utf-8-sig")
     sections = split_log(text)
 
     if not sections:

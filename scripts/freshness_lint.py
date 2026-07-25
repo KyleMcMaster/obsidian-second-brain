@@ -125,7 +125,10 @@ def parse_window(value, default: int) -> int:
 
 def lint_file(path: Path, rel: str, cfg: dict, today: date) -> list[dict]:
     try:
-        text = path.read_text(encoding="utf-8")
+        # utf-8-sig: a BOM otherwise survives into lines[0], the "---" fence
+        # check fails, and every freshness directive in the note is ignored -
+        # so `freshness: snapshot` stops exempting and CI fails on exempt files.
+        text = path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeDecodeError):
         return []
     lines = text.splitlines()

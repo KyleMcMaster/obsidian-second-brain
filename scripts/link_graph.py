@@ -41,7 +41,10 @@ def _skipped(parts) -> bool:
 
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 CODE_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
-INLINE_CODE_RE = re.compile(r"`[^`]*`")
+# Newline-bounded, matching vault_health.py:441. Without the \n exclusion one
+# stray backtick in prose swallows every line up to the next one, so real
+# [[links]] disappear from the graph and their targets look like orphans.
+INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 TYPE_RE = re.compile(r"(?m)^type:\s*[\"']?([A-Za-z0-9_-]+)")
 ALIAS_BLOCK_RE = re.compile(r"(?ms)^aliases:\s*\n((?:\s*-\s*.+\n?)+)")
 ALIAS_INLINE_RE = re.compile(r"(?m)^aliases:\s*\[(.+)\]")

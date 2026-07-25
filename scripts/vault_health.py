@@ -417,7 +417,12 @@ def check_empty_folders(vault: Path, excludes=None) -> list:
     excludes = excludes or _NO_EXCLUDES
     issues = []
     for folder in vault.rglob("*/"):
-        if excludes.skip(folder.parts, folder.relative_to(vault).as_posix()):
+        # Relative parts, like every other call site. `folder` is absolute here,
+        # so folder.parts included every ancestor outside the vault - a vault
+        # under any dir named Templates/.git/_export silently skipped every
+        # folder and the check reported zero findings with no warning.
+        _rel = folder.relative_to(vault)
+        if excludes.skip(_rel.parts, _rel.as_posix()):
             continue
         if not folder.is_dir():
             continue

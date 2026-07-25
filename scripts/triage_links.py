@@ -19,7 +19,8 @@ from datetime import date
 from pathlib import Path
 
 from note_io import read_exact, write_exact
-from vault_health import load_vault, check_wanted_notes, replace_outside_code
+from vault_health import (load_vault, check_wanted_notes, replace_outside_code,
+                          load_vault_config)
 
 LINK_IN_MSG = re.compile(r"\[\[(.+?)\]\]")
 MODEL = "claude-haiku-4-5"
@@ -81,7 +82,8 @@ def load_verdicts(path):
 
 
 def apply_verdicts(vault, verdicts, create_cap):
-    broken = check_wanted_notes(load_vault(vault), vault)
+    broken = check_wanted_notes(load_vault(vault, load_vault_config(vault)), vault,
+                                    load_vault_config(vault))
     deleted, created, skipped = 0, 0, 0
     seen_create = set()
     for iss in broken:
@@ -152,7 +154,8 @@ def main():
             ap.error("--from <prior triage output> is required with --apply")
         verdicts = load_verdicts(args.src)
         d, c, s = apply_verdicts(vault, verdicts, args.create_cap)
-        after = len(check_wanted_notes(load_vault(vault), vault))
+        after = len(check_wanted_notes(load_vault(vault, load_vault_config(vault)), vault,
+                                    load_vault_config(vault)))
         print(f"\nDeleted {d} junk links, created {c} stub notes.")
         if s:
             print(f"Skipped {s} (non-UTF-8 file or unsafe link path, left untouched).")
@@ -162,7 +165,8 @@ def main():
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise SystemExit("set ANTHROPIC_API_KEY")
-    broken = check_wanted_notes(load_vault(vault), vault)
+    broken = check_wanted_notes(load_vault(vault, load_vault_config(vault)), vault,
+                                    load_vault_config(vault))
 
     # One verdict per DISTINCT link text. apply_verdicts keys by link text and acts on
     # every occurrence, so triaging each unique dangling link once (instead of re-asking
