@@ -567,7 +567,7 @@ Steps:
 5. Present a clean summary with counts per category
 6. For safe fixes (missing frontmatter, obvious duplicates, creating pages for concept gaps), offer to fix them automatically
 7. For destructive fixes (archiving, merging, resolving contradictions), list them and ask for explicit confirmation before touching anything
-8. Append to `log.md` with severity counts
+8. Append an operation-log entry with severity counts - if `Logs/` exists write the entry to `Logs/YYYY-MM-DD.md`, otherwise append to `log.md` (SKILL.md's own rule: the root `log.md` is a pointer file in v0.9+ vaults, never an entry target)
 
 ---
 
@@ -595,7 +595,7 @@ Steps:
    - **Clear winner**: rewrite the outdated page, add a History section noting what changed
    - **Ambiguous**: create `wiki/decisions/Conflict - Topic.md` with both sides, mark `status: open`
    - **Evolution**: update the page to current state with historical context
-5. Rebuild affected `index.md` sections, append to `log.md`, update daily note
+5. Rebuild affected `index.md` sections, append an operation-log entry (if `Logs/` exists write the entry to `Logs/YYYY-MM-DD.md`, otherwise append to `log.md` (SKILL.md's own rule: the root `log.md` is a pointer file in v0.9+ vaults, never an entry target)), update daily note
 
 ---
 
@@ -678,7 +678,7 @@ Steps:
    - **Ideas agent**: create or append to Ideas/ for new concepts
    - **Knowledge agent**: create or update Knowledge/ notes for factual claims and frameworks
 7. Update `index.md` with all newly created notes
-8. Append to `log.md`: `## [YYYY-MM-DD] ingest | Source Title (type) - X created, Y updated`
+8. Append an operation-log entry: if `Logs/` exists write `**HH:MM** - ingest | Source Title (type) - X created, Y updated` to `Logs/YYYY-MM-DD.md`; otherwise append `## [YYYY-MM-DD] ingest | Source Title (type) - X created, Y updated` to `log.md`
 9. Update today's daily note with an ingest summary
 
 A single ingest should touch 5-15 files. Compile knowledge once, distribute everywhere.
@@ -902,7 +902,7 @@ Steps:
 2. Run `uv run -m scripts.research.x_pulse "<topic>"`
 3. Show the pulse output verbatim
 4. **Default save: auto-saves** to `Research/X-pulse/YYYY-MM-DD - <slug>.md` (AI-first format)
-5. Append one-line entry to `log.md`
+5. Append a one-line operation-log entry - if `Logs/` exists write the entry to `Logs/YYYY-MM-DD.md`, otherwise append to `log.md` (SKILL.md's own rule: the root `log.md` is a pointer file in v0.9+ vaults, never an entry target)
 
 Plain English: "what's hot on X about AI", "X pulse on vibe coding", "what should I post today on AI automation".
 
@@ -1053,7 +1053,10 @@ Phase 1 - Close the day:
 Phase 2 - Reconcile:
 - Scan wiki/entities/ for outdated roles, companies, or descriptions that conflict with newer daily notes.
 - Scan wiki/concepts/ for claims contradicted by recently ingested sources.
-- Auto-resolve clear winners. Flag ambiguous ones in wiki/decisions/.
+- Flag EVERY contradiction as a `type: conflict` note with `status: open` in wiki/decisions/. Do NOT rewrite any existing page.
+  (Resolving a contradiction means rewriting the outdated note, which is destructive and irreversible while the user sleeps. It also
+  contradicts the constraint below. Leave the resolve step to an interactive /obsidian-reconcile run, matching the health agent's
+  report-only posture.)
 
 Phase 3 - Synthesize:
 - Scan sources ingested today and yesterday. Find concepts that appear in 2+ unrelated sources.
@@ -1065,7 +1068,7 @@ Phase 4 - Heal:
 - Rebuild index.md to reflect today's changes.
 
 Phase 5 - Log:
-- Append to log.md: ## [YYYY-MM-DD] nightly | End of day + X reconciled, Y synthesized, Z orphans linked
+- Append an operation-log entry: if `Logs/` exists write `**HH:MM** - nightly | End of day + X flagged, Y synthesized, Z orphans linked` to `Logs/YYYY-MM-DD.md`; otherwise append `## [YYYY-MM-DD] nightly | ...` to `log.md`
 
 Do not ask questions. Do not fix anything destructive - only add, update, link. Save and stop.
 ```

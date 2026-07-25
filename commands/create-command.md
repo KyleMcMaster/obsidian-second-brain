@@ -19,7 +19,7 @@ The optional argument is a free-text seed describing what the command should do 
 If the seed argument is detailed enough to fill every field yourself - the intent is clear AND you can confidently derive a name, category, trigger phrases, the step outline, and whether it writes to the vault - do NOT run the six-question interview. Instead:
 
 1. Draft the complete spec (name, category, triggers, 3-5 steps, vault-write yes/no) from the seed.
-2. Present it in ONE `AskUserQuestion` call as a single confirm-or-adjust gate: option A "Create it as specced" (show the name + one-line behaviour), option B "Let me adjust" (falls back to the full interview). Include the proposed name in the option label so the user sees it.
+2. Present it in ONE AskUserQuestion tool call as a single confirm-or-adjust gate: option A "Create it as specced" (show the name + one-line behaviour), option B "Let me adjust" (falls back to the full interview). Include the proposed name in the option label so the user sees it.
 3. On "Create it as specced", validate the name (Phase 2 checks: regex `^[a-z][a-z0-9-]*$`, and `commands/<name>.md` does not already exist), then jump straight to Phase 8 (generate the file) and Phase 9 (confirm).
 
 Only the truly under-specified seeds need the full interview. A seed like "summarize my notion pages and save to vault as AI-first notes, call it obsidian-notion, research category" is enough to fast-path. When in doubt, run the interview - one confirmation is fine, but never invent behaviour the seed did not state (see the anti-fabrication rule).
@@ -28,7 +28,7 @@ Only the truly under-specified seeds need the full interview. A seed like "summa
 
 ## Phase 1 - Intent
 
-Ask ONE question via AskUserQuestion:
+Ask ONE question via the AskUserQuestion tool:
 
 > "What problem do you want this new command to solve?" (free text)
 
@@ -40,7 +40,7 @@ Read the answer. Confirm understanding back in one sentence before proceeding.
 
 From the intent, propose 3 candidate kebab-case names. Names should be lowercase, hyphenated, and start with `obsidian-` (vault-management commands) OR a topic prefix (research toolkit uses `research-*`, social uses `x-*`/`brand-*`) OR just a verb (`create-*`, `import-*`).
 
-Use AskUserQuestion (single-select) with 3 options plus "Other" implicit:
+Use the AskUserQuestion tool (single-select) with 3 options plus "Other" implicit:
 
 > "Which name should I use?"
 > - `<candidate-1>`
@@ -55,7 +55,7 @@ After the user picks, validate:
 
 ## Phase 3 - Category
 
-Ask via AskUserQuestion (single-select, 4 options):
+Ask via the AskUserQuestion tool (single-select, 4 options):
 
 > "Which category does this command belong to?"
 > - `vault` - daily writing, capture, find (note creation, retrieval, kanban)
@@ -69,7 +69,7 @@ Ask via AskUserQuestion (single-select, 4 options):
 
 Generate 3-5 natural-language trigger phrases the user might say to invoke this command (not slash-form). Examples from existing commands: `"save this"`, `"deep research"`, `"weekly review"`. Avoid duplicating triggers already used by other commands (read all `commands/*.md` frontmatter `triggers_en:` once and warn on collisions).
 
-Ask via AskUserQuestion (free text, default to your suggested set):
+Ask via the AskUserQuestion tool (free text, default to your suggested set):
 
 > "Trigger phrases the user might say to fire this command, comma-separated:"
 > Default: `<suggestion-1>, <suggestion-2>, <suggestion-3>`
@@ -78,7 +78,7 @@ Ask via AskUserQuestion (free text, default to your suggested set):
 
 ## Phase 5 - Behavior outline
 
-Ask via AskUserQuestion (free text):
+Ask via the AskUserQuestion tool (free text):
 
 > "Describe what the command does in 3-5 numbered steps. Plain English, no code."
 
@@ -88,7 +88,7 @@ Use the answer as the spine of the command body.
 
 ## Phase 6 - Vault writes? (AI-first compliance gate)
 
-Ask via AskUserQuestion (single-select):
+Ask via the AskUserQuestion tool (single-select):
 
 > "Does this command write notes to the user's Obsidian vault?"
 > - `yes` - output must apply the AI-first rule (frontmatter, preamble, wikilinks)
@@ -100,7 +100,7 @@ If `yes`: the generated command body MUST end with the AI-first rule footer (see
 
 ## Phase 7 - External APIs?
 
-Ask via AskUserQuestion (multi-select):
+Ask via the AskUserQuestion tool (multi-select):
 
 > "Does this command call any external APIs?"
 > - Perplexity Sonar (web research)

@@ -56,7 +56,7 @@ The argument is a URL, file path, or pasted text. If no argument, ask what to in
    - Chat screenshots - extract messages, people, decisions
    Save the image description to `raw/articles/` as a markdown summary with context.
 
-   **For articles** - use WebFetch to pull the page content
+   **For articles** - use the WebFetch tool to pull the page content
    **For PDFs** - read the file directly
    **For pasted text** - use as-is
 

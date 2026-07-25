@@ -236,8 +236,12 @@ def run_paid_deep(topic: str) -> int:
     try:
         gap_result = perplexity.call(gap_prompt, deep=False, max_tokens=2000, command="research-deep")
     except Exception as e:
-        print(f"Phase 2 (gap analysis) failed: {e}", file=sys.stderr)
-        return 1
+        # commands/research-deep.md: "the run continues with what it has and flags
+        # the gap in the synthesis ... a partial synthesis is better than no
+        # synthesis." Aborting here discarded the vault scan already completed.
+        # The per-query Phase 3 path already degrades this way.
+        print(f"Phase 2 (gap analysis) failed, continuing on the vault baseline: {e}", file=sys.stderr)
+        gap_result = {"text": f"(gap analysis unavailable: {e})"}
 
     queries = parse_queries(gap_result["text"])
     print(f"[/research-deep] Identified {len(queries)} targeted queries.", file=sys.stderr)
@@ -303,8 +307,16 @@ def run_paid_deep(topic: str) -> int:
         # sonar-deep-research has a hardcoded "10k-word academic narrative" that overrides our prompt.
         synth = perplexity.call(synth_prompt, model="sonar-reasoning-pro", max_tokens=3500, command="research-deep")
     except Exception as e:
-        print(f"Phase 4 (synthesis) failed: {e}", file=sys.stderr)
-        return 1
+        # Same contract. Losing Phase 4 must not also discard the vault baseline
+        # and every gap-fill result Phase 3 already paid for; write them through
+        # clearly labelled as un-synthesized.
+        print(f"Phase 4 (synthesis) failed, writing un-synthesized findings: {e}", file=sys.stderr)
+        synth = {"text": (
+            f"> **Synthesis unavailable** ({e}). The vault baseline and raw Phase 3 "
+            "findings below are un-synthesized: they have not been reconciled against "
+            "each other or against the vault. Treat them as raw input, and re-run "
+            "`/research-deep` on this topic when the provider is reachable.\n"
+        )}
 
     body = synth["text"]
     print(body)

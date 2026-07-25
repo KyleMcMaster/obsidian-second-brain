@@ -46,7 +46,13 @@ def get_video_metadata(video_id: str) -> dict[str, Any] | None:
         return None
     try:
         from googleapiclient.discovery import build
-        yt = build("youtube", "v3", developerKey=key, cache_discovery=False)
+        # An explicit transport timeout. Without one googleapiclient falls back to
+        # httplib2's default of none, so a slow (not down) Data API blocks the whole
+        # /youtube command - including the plain non-visual path - with no bound and
+        # no way for the caller to recover. Matches lib/http.py's DEFAULT_TIMEOUT.
+        import httplib2
+        yt = build("youtube", "v3", developerKey=key, cache_discovery=False,
+                   http=httplib2.Http(timeout=15))
         resp = yt.videos().list(part="snippet,statistics,contentDetails", id=video_id).execute()
         items = resp.get("items", [])
         if not items:
@@ -78,7 +84,13 @@ def get_top_comments(video_id: str, max_results: int = 20) -> list[dict[str, Any
         return []
     try:
         from googleapiclient.discovery import build
-        yt = build("youtube", "v3", developerKey=key, cache_discovery=False)
+        # An explicit transport timeout. Without one googleapiclient falls back to
+        # httplib2's default of none, so a slow (not down) Data API blocks the whole
+        # /youtube command - including the plain non-visual path - with no bound and
+        # no way for the caller to recover. Matches lib/http.py's DEFAULT_TIMEOUT.
+        import httplib2
+        yt = build("youtube", "v3", developerKey=key, cache_discovery=False,
+                   http=httplib2.Http(timeout=15))
         resp = yt.commentThreads().list(
             part="snippet",
             videoId=video_id,

@@ -777,7 +777,15 @@ def get_skill(name: str) -> Dict[str, Any]:
     note = (
         "Run this skill using the MCP tools on this server for vault I/O: "
         "obsidian_search (find/recall), obsidian_read_note (read), "
-        "obsidian_save_note / obsidian_capture (write). Follow the steps below."
+        "obsidian_backlinks (graph), "
+        "obsidian_update_note (append to, or set frontmatter on, an EXISTING note - "
+        "use this whenever a step says update, rewrite, or integrate), "
+        "obsidian_save_note / obsidian_capture (create a NEW note), "
+        "obsidian_validate_note (check a note before or after a write). "
+        "A step calling for a full rewrite of an existing note cannot be done with "
+        "these tools: report that to the user rather than approximating it with a "
+        "new note, which produces exactly the duplicates these playbooks forbid. "
+        "Follow the steps below."
     )
     return {
         "name": name,
