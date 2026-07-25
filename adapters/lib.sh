@@ -18,7 +18,8 @@ CAPABILITY_VOCAB="read write edit bash webfetch websearch task todo"
 # Empty if the key is not found.
 parse_frontmatter() {
   local file="$1" key="$2"
-  awk -v key="$key" '
+  LC_ALL=C awk -v key="$key" '
+    NR == 1 { sub(/^\xef\xbb\xbf/, "") }
     { sub(/\r$/, "") }
     /^---$/ { fm++; next }
     fm == 1 {
@@ -26,6 +27,24 @@ parse_frontmatter() {
       if (match($0, "^" key ":[[:space:]]*")) {
         value = substr($0, RLENGTH + 1)
         sub(/[[:space:]]+$/, "", value)
+        # Block scalar: the value is on the following, more-indented lines.
+        # Without this the caller received a literal ">" or "|", which is
+        # non-empty and so silently defeats every empty-value fallback.
+        if (value == ">" || value == "|" || value == ">-" || value == "|-" ||
+            value == ">+" || value == "|+") {
+          value = ""
+          while ((getline line) > 0) {
+            sub(/\r$/, "", line)
+            if (line ~ /^---$/) break
+            if (line !~ /^[[:space:]]/ || line ~ /^[[:space:]]*$/) {
+              if (line ~ /^[[:space:]]*$/) continue
+              break
+            }
+            sub(/^[[:space:]]+/, "", line)
+            sub(/[[:space:]]+$/, "", line)
+            value = (value == "" ? line : value " " line)
+          }
+        }
         print value
         exit
       }
@@ -38,7 +57,8 @@ parse_frontmatter() {
 # Echoes everything after the closing --- of the frontmatter block.
 command_body() {
   local file="$1"
-  awk '
+  LC_ALL=C awk '
+    NR == 1 { sub(/^\xef\xbb\xbf/, "") }
     { sub(/\r$/, "") }
     fm < 2 && /^---$/ { fm++; next }
     fm >= 2 { print }

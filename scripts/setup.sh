@@ -93,11 +93,16 @@ green "   OBSIDIAN_VAULT_PATH set"
 
 # Wire the vault path into the research toolkit .env so standalone runs resolve it
 if [ -f "$ENV_FILE" ]; then
-  VAULT="$VAULT" awk '
-    /^OBSIDIAN_VAULT_PATH=/ { print "OBSIDIAN_VAULT_PATH=" ENVIRON["VAULT"]; done=1; next }
-    { print }
-    END { if (!done) print "OBSIDIAN_VAULT_PATH=" ENVIRON["VAULT"] }
-  ' "$ENV_FILE" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+  # umask 077 on the rewrite: the temp file is created fresh, so under a default
+  # umask the mv silently replaced install.sh's 0600 with 0644 and exposed every
+  # API key in this file to any other account on the machine. Same pattern as
+  # integrations/telegram-journal/setup.sh, plus an explicit chmod as a backstop.
+  ( umask 077
+    VAULT="$VAULT" awk '
+      /^OBSIDIAN_VAULT_PATH=/ { print "OBSIDIAN_VAULT_PATH=" ENVIRON["VAULT"]; done=1; next }
+      { print }
+      END { if (!done) print "OBSIDIAN_VAULT_PATH=" ENVIRON["VAULT"] }
+    ' "$ENV_FILE" > "$ENV_FILE.tmp" ) && mv "$ENV_FILE.tmp" "$ENV_FILE" && chmod 600 "$ENV_FILE"
   green "   OBSIDIAN_VAULT_PATH written to research .env"
 fi
 
