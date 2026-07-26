@@ -25,6 +25,8 @@ point for `.vault-config.json`; this module is the floor beneath it.
 
 from __future__ import annotations
 
+import re
+
 # Never scanned by any tool. Everything here is machine-owned: version control,
 # editor and agent configuration, build output, trash, dependencies.
 BASE_EXCLUDE_DIRS: frozenset[str] = frozenset({
@@ -71,3 +73,29 @@ def is_excluded(parts, excludes: frozenset[str]) -> bool:
     exactly what happened in vault_health's empty-folder check (B29).
     """
     return any(str(p).lower() in excludes for p in parts)
+
+
+# ── Frontmatter ─────────────────────────────────────────────────────────────
+# Six tools parsed the frontmatter block with three different algorithms and
+# three different regexes. They disagreed on real input: a note whose opening
+# fence carries trailing whitespace had frontmatter according to vault_health
+# and vault_stats, and none according to export_okf - which then wrote the
+# frontmatter into the exported body as prose and typed the note `note`.
+#
+# `\s*` after both fences is the permissive form the two scanners already used.
+FRONTMATTER_RE = re.compile(r"^---[ \t]*\n(.*?)\n---[ \t]*(?:\n|$)", re.DOTALL)
+
+
+def split_frontmatter(text: str) -> tuple[str, str]:
+    """Return (frontmatter_text, body). Both empty-safe.
+
+    Tolerates a UTF-8 BOM and trailing whitespace on either fence, which is what
+    the divergent copies disagreed about. A note with no frontmatter returns
+    ("", text) rather than raising, so callers need no special case.
+    """
+    if text.startswith("﻿"):
+        text = text[1:]
+    m = FRONTMATTER_RE.match(text)
+    if not m:
+        return "", text
+    return m.group(1), text[m.end():]

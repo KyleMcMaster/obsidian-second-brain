@@ -33,7 +33,13 @@ import pathlib
 
 import yaml
 
-FM_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.DOTALL)
+# Tolerates trailing whitespace on either fence, matching vault_health and
+# vault_stats. Without it a note whose opening fence carried a trailing space
+# had frontmatter to those two and none here, so the export wrote the
+# frontmatter into the body as prose and typed the note `note`.
+# Two groups (fm, body) is this module's own shape; the pattern is pinned to
+# vault_scan.FRONTMATTER_RE by tests/test_frontmatter_parity.py.
+FM_RE = re.compile(r"^---[ \t]*\n(.*?)\n---[ \t]*\n?(.*)$", re.DOTALL)
 WIKILINK_RE = re.compile(r"(!?)\[\[([^\]]+)\]\]")
 # Compared lowercased; any folder ENDING in "templates" is also skipped (matching
 # vault_health.load_vault), so the canonical capital Templates/ stays out too.

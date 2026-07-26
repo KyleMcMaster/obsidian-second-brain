@@ -28,7 +28,7 @@
 #     vault's own _CLAUDE.md. Ships inert (same philosophy as the enable flag).
 #
 # Logs:
-#   - /tmp/obsidian-bg-agent.log        - stdout/stderr of the headless run
+#   - $TMPDIR/obsidian-bg-agent-$(id -u).log - stdout/stderr, mode 0600
 #   - $VAULT/.claude-runs/YYYY-MM-DD.jsonl - one JSONL line per run outcome
 #     (early-exit reason, or starting + completed with duration and exit code)
 
@@ -123,7 +123,13 @@ if [[ "${CLAUDE_VAULT_PROPAGATION:-0}" == "1" && -n "$ORIGIN_CWD" && -f "$ORIGIN
 fi
 
 # Build prompt in a temp file to handle special characters in the summary safely
-PROMPT_FILE=$(mktemp /tmp/obsidian-bg-XXXXXX.txt)
+# Per-user log path. A fixed name in the shared /tmp is world-readable
+# under a default umask and predictable, so on a multi-user host anyone
+# can read the running commentary on this vault - and can pre-create the
+# path as a symlink, since macOS does not enable protected_symlinks.
+BG_LOG="${TMPDIR:-/tmp}/obsidian-bg-agent-$(id -u).log"
+( umask 077; : >> "$BG_LOG" ) 2>/dev/null || true
+PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/obsidian-bg-XXXXXX.txt")
 
 cat > "$PROMPT_FILE" << HEADER
 You are an autonomous Obsidian vault agent. The Claude session was just compacted.
@@ -221,7 +227,7 @@ log_run "starting" summary_chars "${#SUMMARY}" hints_chars "${#PROJECT_HINTS}"
   # is asked to respect. Filesystem only: no Bash, no network.
   claude --dangerously-skip-permissions --strict-mcp-config \
     --allowedTools "Read,Write,Edit,Glob,Grep" \
-    -p < "$PROMPT_FILE" >> /tmp/obsidian-bg-agent.log 2>&1
+    -p < "$PROMPT_FILE" >> "$BG_LOG" 2>&1
   EXIT_CODE=$?
   rm -f "$PROMPT_FILE"
   log_run "completed" duration_sec "$(( $(date +%s) - START_TIME ))" exit_code "$EXIT_CODE"

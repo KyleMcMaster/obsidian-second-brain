@@ -28,7 +28,7 @@
 # as the command's final argument.
 #
 # Contract: always print `{}` to stdout (silent no-op for an observer hook).
-# Logs: /tmp/obsidian-hermes-session-end.log
+# Logs: $TMPDIR/obsidian-hermes-session-end-$(id -u).log, mode 0600
 
 emit_noop() { printf '{}\n'; }
 
@@ -63,7 +63,13 @@ CONSOLIDATE_CMD="${OBSIDIAN_HERMES_CONSOLIDATE_CMD:-hermes -z}"
 
 (
   cd "$VAULT" 2>/dev/null && \
-  $CONSOLIDATE_CMD "$PROMPT" >> /tmp/obsidian-hermes-session-end.log 2>&1
+  # Per-user log path. A fixed name in the shared /tmp is world-readable
+  # under a default umask and predictable, so on a multi-user host anyone
+  # can read the running commentary on this vault - and can pre-create the
+  # path as a symlink, since macOS does not enable protected_symlinks.
+  HERMES_LOG="${TMPDIR:-/tmp}/obsidian-hermes-session-end-$(id -u).log"
+  ( umask 077; : >> "$HERMES_LOG" ) 2>/dev/null || true
+  $CONSOLIDATE_CMD "$PROMPT" >> "$HERMES_LOG" 2>&1
 ) &
 
 emit_noop

@@ -79,6 +79,36 @@ build_one() {
   success "$platform → dist/$platform/"
 }
 
+# ── Validate exclude: tokens ────────────────────────────────────────────────
+# `exclude:` is the only mechanism keeping a Claude-only command out of a
+# platform where it cannot work, and it was an unvalidated string match. A
+# plausible misspelling (codex for codex-cli, agentskills for agent-skills)
+# shipped the command everywhere with exit 0 and no warning. The one command
+# that relies on this today spells all six correctly by luck.
+validate_excludes() (
+  # Subshell + its own source: adapters/lib.sh is sourced inside build_one, so
+  # parse_frontmatter is not available at this scope.
+  source "$REPO_ROOT/adapters/lib.sh"
+  local valid; valid=" $(discover_platforms | tr '\n' ' ')"
+  local bad=0 f raw tok
+  for f in "$REPO_ROOT"/commands/*.md; do
+    [[ -f "$f" ]] || continue
+    raw="$(parse_frontmatter "$f" exclude)"
+    [[ -z "$raw" || "$raw" == "[]" ]] && continue
+    for tok in $(echo "$raw" | tr -d '[]"' | tr ',' ' '); do
+      [[ -z "$tok" ]] && continue
+      case "$valid" in
+        *" $tok "*) ;;
+        *) echo "error: $(basename "$f") excludes unknown platform '$tok'" >&2
+           echo "       valid platforms:$valid" >&2
+           bad=1 ;;
+      esac
+    done
+  done
+  [[ $bad -eq 0 ]]
+)
+validate_excludes || exit 1
+
 # ── Main ────────────────────────────────────────────────────────────────────
 if [[ -n "$PLATFORM" ]]; then
   build_one "$PLATFORM"

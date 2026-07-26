@@ -222,7 +222,14 @@ def load_vault(vault: Path, excludes=None) -> dict:
         # *.md would crash the read and abort the whole scan (stress-test fix 2/24).
         if not md.is_file():
             continue
-        rel = str(md.relative_to(vault))
+        # POSIX form, not str(): on Windows str(WindowsPath) yields backslashes,
+        # so every `rel.split("/")` below saw no separator. Top-folder logic then
+        # returned "" for every note, and the whole skip_folders/dated-series
+        # exemption collapsed - every note under Daily/, Journal/, Private/ was
+        # reported as an orphan. CI is ubuntu-only so nothing caught it.
+        # Consumers rebuild paths as `vault / rel`, which accepts forward slashes
+        # on Windows, so no downstream change is needed.
+        rel = md.relative_to(vault).as_posix()
         try:
             content = md.read_text(encoding="utf-8-sig", errors="replace")
         except OSError:
