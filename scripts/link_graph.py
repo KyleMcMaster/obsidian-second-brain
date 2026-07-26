@@ -77,8 +77,12 @@ EDGE_INVERSE = {
 }
 # Asymmetric ordering types: A->B and B->A of the SAME type is a logical
 # contradiction (A supersedes B while B supersedes A), not just a missing inverse.
-ASYMMETRIC_TYPES = {"supersedes", "superseded_by", "depends_on", "required_by",
-                    "caused", "caused_by", "decided_by", "decides"}
+# Derived, not hand-maintained. This is exactly the set of types whose inverse
+# is not itself, so listing it separately meant a contributor adding a new pair
+# to EDGE_INVERSE and forgetting this line would make lint_graph silently stop
+# detecting missing reciprocals for that type - no error, just a class of
+# finding quietly gone.
+ASYMMETRIC_TYPES = frozenset(t for t, inv in EDGE_INVERSE.items() if inv != t)
 LEGACY_EDGE_KEYS = {"supersedes", "superseded_by"}
 _REL_KEY_RE = re.compile(r"^(\s*)([A-Za-z_][A-Za-z0-9_]*):(.*)$")
 _WIKILINK_IN_RE = re.compile(r"\[\[([^\]|#]+)")
