@@ -13,6 +13,8 @@
 
 <p align="center">
   <strong>One codebase. Seven CLIs. Same brain.</strong>
+  <br />
+  <em>Your vault outlives whichever CLI you switch to.</em>
 </p>
 
 <p align="center">
@@ -32,18 +34,22 @@
   <br /><br />
   <strong>Powered by <a href="references/freshness-policy.md">OKM - Open Knowledge Metabolism</a>:</strong> <em>every stored fact is timeless, dated, or a pointer - so your knowledge base never fills with facts that used to be true.</em>
   <br /><br />
-  <em>45 commands &middot; auto-synthesis &middot; thinking tools that argue with you</em>
+  <strong>Built for</strong> <em>developers &middot; founders and operators &middot; writers &middot; researchers - <a href="#choose-your-preset">pick a preset at setup</a></em>
+  <br /><br />
+  <strong>Start with three:</strong> <em><code>/obsidian-init</code> to set up, <code>/obsidian-save</code> to capture, <code>/obsidian-find</code> to recall. The other 42 are there when you need them.</em>
+  <br /><br />
+  <em>auto-synthesis &middot; thinking tools that argue with you</em>
   <br /><br />
   <em>live research from X, the web, and YouTube &middot; 4 scheduled agents &middot; 4 role presets</em>
   <br /><br />
   <em>write-time AI-first validator &middot; <code>/create-command</code> interview flow &middot; multilingual trigger schema</em>
   <br /><br />
+  <a href="#install"><strong>Install &rarr;</strong></a> &middot;
   <a href="DEMOS.md">Demos</a> &middot;
-  <a href="#the-vault-is-alive">OKM</a> &middot;
   <a href="#what-happens-when-you-install-this">See it in action</a> &middot;
   <a href="#45-commands">All commands</a> &middot;
-  <a href="#install">Install</a> &middot;
   <a href="#choose-your-preset">Presets</a> &middot;
+  <a href="#the-vault-is-alive">OKM</a> &middot;
   <a href="https://github.com/eugeniughelbur/obsidian-second-brain/discussions">Discussions</a>
 </p>
 
