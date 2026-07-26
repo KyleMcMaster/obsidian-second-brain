@@ -39,11 +39,11 @@ agent) should follow when the user's request matches its trigger phrase.
 2. When the user's request matches a trigger in the tables below, read the
    matching file under `.opencode/commands/<name>.md` and follow its
    instructions step by step.
-3. Treat the AI-first vault rule (`.opencode/references/ai-first-rules.md`) as
-   non-negotiable for every note you write: `## For future Claude` preamble,
-   rich frontmatter (`type`, `date`, `tags`, `ai-first: true`), `[[wikilinks]]`
-   for every person/project/concept, recency markers per external claim,
-   sources verbatim, confidence levels where applicable.
+EOF
+
+    emit_ai_first_rule ".opencode/references/ai-first-rules.md"
+
+    cat <<'EOF'
 
 ## Command routing tables (grouped by category)
 EOF

@@ -60,11 +60,11 @@ load only when a skill is selected (progressive disclosure).
 2. When the user's request matches a skill, invoke it - by \`\$<skill-name>\`,
    via \`/skills\`, or let Codex select it implicitly from its description.
    You do not need a routing table here; the skill list is the router.
-3. Treat the AI-first vault rule (\`.codex/references/ai-first-rules.md\`) as
-   non-negotiable for every note you write: \`## For future Claude\` preamble,
-   rich frontmatter (\`type\`, \`date\`, \`tags\`, \`ai-first: true\`),
-   \`[[wikilinks]]\` for every person/project/concept, recency markers per
-   external claim, sources verbatim, confidence levels where applicable.
+EOF
+
+    emit_ai_first_rule ".codex/references/ai-first-rules.md"
+
+    cat <<EOF
 4. Do not invent skills. If none matches, ask the user or fall back to plain
    natural-language help.
 

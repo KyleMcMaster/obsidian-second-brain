@@ -373,3 +373,21 @@ strip_quotes() {
   v="${v#\'}"; v="${v%\'}"
   printf '%s' "$v"
 }
+
+# emit_ai_first_rule <references_path>
+# Step 3 of every dispatcher's "How to operate" block: the AI-first write spec
+# summary. Was hand-copied into four adapters with only the path differing,
+# which is exactly how B21 happened - two of the four cited a path that did not
+# exist in their own build, and nobody noticed because each was maintained
+# separately. CLAUDE.md says this rule must change in lockstep across platforms;
+# one definition is what makes that true rather than aspirational.
+emit_ai_first_rule() {
+  local refs_path="$1"
+  cat <<EOF
+3. Treat the AI-first vault rule (\`${refs_path}\`) as
+   non-negotiable for every note you write: \`## For future Claude\` preamble,
+   rich frontmatter (\`type\`, \`date\`, \`tags\`, \`ai-first: true\`),
+   \`[[wikilinks]]\` for every person/project/concept, recency markers per
+   external claim, sources verbatim, confidence levels where applicable.
+EOF
+}
