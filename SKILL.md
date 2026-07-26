@@ -325,7 +325,7 @@ Completed items move to the `## ✅ Done` column with a strikethrough: `- [x] ~~
 
 ### Run vault health check
 ```bash
-python scripts/vault_health.py --path ~/path/to/vault
+uv run --directory "SKILL_ROOT" scripts/vault_health.py --path ~/path/to/vault
 ```
 Reports: duplicate notes, orphaned files (no incoming links), stale tasks (overdue), empty folders, broken links, notes missing frontmatter.
 
@@ -547,7 +547,7 @@ If a project name argument is given, shows deep context for that one project onl
 **Runs a vault health check and summarizes findings.**
 
 Steps:
-1. Run: `python scripts/vault_health.py --path ~/path/to/vault --json`
+1. Run: `uv run --directory "SKILL_ROOT" scripts/vault_health.py --path ~/path/to/vault --json`
 2. Parse the JSON output and split findings into categories
 3. Spawn parallel subagents to handle each category simultaneously:
    - **Links agent**: verify broken links, attempt to resolve them
@@ -1106,7 +1106,7 @@ Setup:
 
 Prompt to schedule:
 ```
-Read _CLAUDE.md. Run: python scripts/vault_health.py --path ~/path/to/vault --json
+Read _CLAUDE.md. Run: uv run --directory "SKILL_ROOT" scripts/vault_health.py --path ~/path/to/vault --json
 Parse the output. Write a health report to Knowledge/Vault Health YYYY-MM-DD.md
 summarizing findings by severity (critical, warning, info).
 Do not fix anything autonomously - only report.

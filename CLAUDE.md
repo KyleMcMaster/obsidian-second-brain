@@ -42,7 +42,7 @@ If you are editing a command file in `commands/`, do not rewrite the AI-first pr
 ## Conventions
 
 - **Markdown:** sentence-case headers (`## What it does`, not `## What It Does`). No emojis in command files. No substitution Unicode in source files, docs, or commits: em-dashes (`—`), en-dashes (`–`), curly/smart quotes, and Unicode math substitutions (`≥ ≤ ≠`) are banned. Allowed: box-drawing chars (`─` U+2500-257F), arrows (`→ ←`), currency symbols (`€ £ ¥`), and Nerd Font / private-use codepoints - all carry semantic meaning rather than substituting for ASCII. Enforced by `hooks/validate-ai-first.sh` check 5 on vault writes.
-- **Python:** ruff with `line-length = 100`, target `py310`. Type hints encouraged, not required.
+- **Python:** ruff, target `py310`. CI runs `ruff check .`; the gated rule set is pinned in `pyproject.toml` under `[tool.ruff.lint]` and is currently pyflakes (`F`) only, with a comment there listing what is excluded and why. `line-length = 100` is the formatting convention, not a build-breaking rule - there are 203 existing violations, so gating it means fixing that backlog first, not adding a noqa sweep.
 - **Commits:** imperative mood (`Add`, `Fix`, `Update`). Co-author Claude when pair-programmed.
 - **Frontmatter:** YAML, double-quoted strings when in doubt, lowercase tag values.
 

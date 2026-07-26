@@ -942,7 +942,7 @@ Decision record (ADR). Captures the context, options considered, the decision, a
 
 ## Consequences
 """)
-        write(vault / "Templates/OKR.md", f"""---
+        write(vault / "Templates/OKR.md", """---
 date: <% tp.date.now("YYYY-MM-DD") %>
 type: okr
 tags:

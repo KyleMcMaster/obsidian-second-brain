@@ -145,7 +145,14 @@ def main() -> int:
         # warns 'unreadable' on files that exist (seen on CI with the sample
         # vault's em-dash filenames).
         result = subprocess.run(
-            ['git', '-c', 'core.quotepath=false', 'ls-files', '*.md', '*.py', '*.sh'],
+            # CLAUDE.md bans substitution Unicode in "source files, docs, or
+            # commits" generally, but this only ever scanned md/py/sh, so YAML,
+            # TOML, JSON, and dotfiles were ungated. There are currently zero
+            # violations outside the original three, which is exactly when
+            # widening is cheap - it closes the gap before it opens.
+            ['git', '-c', 'core.quotepath=false', 'ls-files',
+             '*.md', '*.py', '*.sh', '*.yml', '*.yaml', '*.toml', '*.json',
+             '*.cff', '*.txt', '.env.example'],
             capture_output=True, text=True,
         )
         files = [Path(f) for f in result.stdout.splitlines() if f.strip()]

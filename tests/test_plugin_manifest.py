@@ -35,6 +35,25 @@ def test_plugin_manifest_parses_and_matches_pyproject_version():
     assert plugin["version"] == _pyproject_version()
 
 
+def test_citation_cff_version_matches_pyproject():
+    """CLAUDE.md's release process says this file fails CI if CITATION.cff
+    drifts. It did not: nothing here opened that file, so a missed bump shipped
+    a release whose Zenodo/DOI citation advertised the wrong version, and the
+    only way to notice was to read it. A regex avoids adding a YAML dependency
+    to the CI install list."""
+    text = (REPO_ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    match = re.search(r'^version:\s*"?([^"\n]+)"?\s*$', text, re.MULTILINE)
+    assert match, "CITATION.cff has no top-level version key"
+    assert match.group(1).strip() == _pyproject_version()
+
+
+def test_marketplace_metadata_version_matches_pyproject():
+    """The marketplace has two version fields. Only the plugin entry was
+    checked, so metadata.version could drift unnoticed."""
+    market = _load(".claude-plugin/marketplace.json")
+    assert market["metadata"]["version"] == _pyproject_version()
+
+
 def test_marketplace_catalog_agrees_with_plugin_manifest():
     plugin = _load(".claude-plugin/plugin.json")
     market = _load(".claude-plugin/marketplace.json")

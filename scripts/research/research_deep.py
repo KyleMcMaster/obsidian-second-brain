@@ -231,7 +231,7 @@ def run_paid_deep(topic: str) -> int:
     baseline = load_baseline(hits)
     print(f"[/research-deep] Found {len(hits)} relevant vault notes.", file=sys.stderr)
 
-    print(f"[/research-deep] Phase 2: identifying gaps via Perplexity (sonar-pro, fast)...", file=sys.stderr)
+    print("[/research-deep] Phase 2: identifying gaps via Perplexity (sonar-pro, fast)...", file=sys.stderr)
     gap_prompt = GAP_PROMPT.format(topic=topic, today=today, baseline=baseline)
     try:
         gap_result = perplexity.call(gap_prompt, deep=False, max_tokens=2000, command="research-deep")
@@ -246,7 +246,7 @@ def run_paid_deep(topic: str) -> int:
     queries = parse_queries(gap_result["text"])
     print(f"[/research-deep] Identified {len(queries)} targeted queries.", file=sys.stderr)
 
-    print(f"[/research-deep] Phase 3: filling gaps...", file=sys.stderr)
+    print("[/research-deep] Phase 3: filling gaps...", file=sys.stderr)
     findings_chunks: list[str] = []
     sources_collected: list[str] = []
 
@@ -283,7 +283,7 @@ def run_paid_deep(topic: str) -> int:
     # without TAVILY_API_KEY; never fatal.
     from .lib import web_reader
     if web_reader.available() and sources_collected:
-        print(f"[/research-deep] Phase 3.5: extracting full text of top sources (Tavily)...", file=sys.stderr)
+        print("[/research-deep] Phase 3.5: extracting full text of top sources (Tavily)...", file=sys.stderr)
         extracted = web_reader.read(sources_collected)
         if extracted:
             blocks = "\n\n".join(
@@ -295,7 +295,7 @@ def run_paid_deep(topic: str) -> int:
             )
             print(f"[/research-deep] Extracted {len(extracted)} pages.", file=sys.stderr)
 
-    print(f"[/research-deep] Phase 4: synthesizing delta vs vault baseline...", file=sys.stderr)
+    print("[/research-deep] Phase 4: synthesizing delta vs vault baseline...", file=sys.stderr)
     synth_prompt = SYNTHESIS_PROMPT.format(
         topic=topic,
         today=today,

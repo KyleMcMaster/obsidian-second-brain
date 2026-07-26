@@ -9,7 +9,6 @@ straightened ruler without needing Ollama.
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 from pathlib import Path

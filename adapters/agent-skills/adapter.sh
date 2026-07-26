@@ -183,6 +183,13 @@ EOF
 
 _ask_emit_install_hint() {
   local dst="$1"
+  # Computed, not hardcoded. The previous literals (43 / 44) went stale on every
+  # command added or excluded, so the documented verification step told the user
+  # to expect a number the build does not produce - worse than no check.
+  local ASK_CMD_COUNT=0 f
+  for f in "$(dirname "$dst")"/../commands/*.md; do :; done
+  ASK_CMD_COUNT="$(find "$dst/$ASK_SKILLS_DIR" -mindepth 1 -maxdepth 1 -type d \
+                    ! -name "$ASK_CORE" 2>/dev/null | wc -l | tr -d ' ')"
   cat > "$dst/INSTALL.md" <<EOF
 # Install as Agent Skills (Antigravity / Codex CLI / OpenCode)
 
@@ -192,7 +199,7 @@ open \`.agents/skills/\` standard - Google **Antigravity**, OpenAI **Codex CLI**
 automatically: each skill's name and description stay visible, and the full body
 loads only when the skill is selected (progressive disclosure).
 
-The tree contains \`skills/<name>/SKILL.md\` (43 command skills) plus the shared
+The tree contains \`skills/<name>/SKILL.md\` (${ASK_CMD_COUNT} command skills) plus the shared
 \`skills/${ASK_CORE}/\` engine skill (references, scripts, pyproject). There is
 deliberately **no SKILL.md at the tree root** - a root SKILL.md shadows the
 nested skills during discovery.
@@ -204,7 +211,7 @@ GitHub-as-registry installer that writes one shared \`.agents/skills/\` tree all
 three harnesses read. Run from your vault root:
 
 \`\`\`bash
-# preview what would install (should list 44: 43 commands + ${ASK_CORE})
+# preview what would install (should list $((ASK_CMD_COUNT + 1)): ${ASK_CMD_COUNT} commands + ${ASK_CORE})
 npx skills add ./dist/agent-skills --list
 
 # project-scope install for one or more harnesses (one physical tree serves all)

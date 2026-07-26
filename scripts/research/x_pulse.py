@@ -5,10 +5,8 @@ Output: hot themes (with rep posts + voices), gaps, hooks working, voice/tone, p
 Default behavior: print to chat AND save AI-first note to Research/X-pulse/.
 """
 
-import json
 import sys
 from datetime import datetime
-from pathlib import Path
 from .lib import grok, vault
 
 PROMPT_TEMPLATE = """You are a social-media-aware analyst with live access to X. Topic: "{topic}"

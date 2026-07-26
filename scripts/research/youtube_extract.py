@@ -191,14 +191,14 @@ def main(argv: list[str]) -> int:
     # return shape. No Gemini key = exactly the old Grok-only behavior.
     result = None
     if os.environ.get("GEMINI_API_KEY", "").strip():
-        print(f"[/youtube] Summarizing via Gemini (free tier)...\n", file=sys.stderr)
+        print("[/youtube] Summarizing via Gemini (free tier)...\n", file=sys.stderr)
         try:
             from .lib import gemini
             result = gemini.call(prompt, command="youtube", max_output_tokens=3000)
         except Exception as e:  # noqa: BLE001 - fall back to Grok on any Gemini failure
             print(f"[/youtube] Gemini failed ({e}); falling back to Grok...", file=sys.stderr)
     if result is None:
-        print(f"[/youtube] Summarizing via Grok...\n", file=sys.stderr)
+        print("[/youtube] Summarizing via Grok...\n", file=sys.stderr)
         try:
             result = grok.call(prompt, command="youtube", max_output_tokens=3000)
         except Exception as e:

@@ -4,7 +4,6 @@ abort the research call it is observing (fork-insights round 2, the
 api-ledger fork's pattern)."""
 
 from datetime import datetime
-from pathlib import Path
 import json
 import sys
 
