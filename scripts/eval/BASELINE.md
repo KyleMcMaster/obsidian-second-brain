@@ -59,3 +59,41 @@ freshness re-rank + status fade, 100% index coverage via adaptive splitting.
 # per mode x case set; --generate NEW sets only with --force or a new --cases path
 uv run python scripts/eval/retrieval_eval.py --mode default --cases scripts/eval/retrieval_cases.jsonl --json
 ```
+
+## Rejected: type weighting on the fused rank (2026-07-26)
+
+Fix 13/24 rejected multiplicative type weights applied to raw cosine: log notes
+were deleted outright and recall halved. It was scored on the two English case
+sets, which did not yet include the multilingual one, so the same idea was worth
+re-testing at a different layer against the set it had never seen.
+
+Hypothesis: RU/ES misses are not ranking failures but the canonical note losing
+to a longer log about the same topic. Inspecting all 6 misses supports that -
+the query for `Codru.md` returns `2026-06-27 - codru-team-second-brain-pos...`,
+a log. The lexical arm already applies a type weight, but a Russian or Spanish
+query shares no terms with an English note, so that arm contributes nothing and
+the fused rank is effectively pure cosine with no type awareness.
+
+Applied `_SEARCH_ENTITY_BOOST` / `_SEARCH_LOG_WEIGHT` to the RRF score rather
+than to cosine, on the reasoning that RRF is rank-based and bounded so the same
+weight is a far gentler nudge.
+
+Measured on all three sets. It is worse everywhere, including the target:
+
+| case set | metric | before | after |
+|---|---|---|---|
+| EN paraphrase | MRR | 0.474 | 0.335 |
+| EN paraphrase | recall@1 | 0.371 | 0.171 |
+| EN keyword | recall@10 | 1.000 | 0.833 |
+| EN keyword | misses | 0 | 5 |
+| RU/ES | MRR | 0.440 | 0.249 |
+| RU/ES | misses | 6 | 7 |
+
+Reverted. The likely reason it fails at either layer: a large share of correct
+answers ARE logs and dailies, so a flat 0.5 on that type costs more than the
+entity boost recovers. Fix 13/24's conclusion holds at the fusion layer too.
+
+**O1 remains open.** The diagnosis stands - r@5 and r@10 are both exactly 0.625,
+so for 6 of 16 cases the gold note never enters the candidate pool and no
+re-ranking can reach it. Whatever fixes it has to change what the retrieval
+stage surfaces, not how the results are ordered.
