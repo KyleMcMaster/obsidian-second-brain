@@ -11,6 +11,7 @@ with type/date/tags/ai-first, a `## For future Claude` preamble, and a
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 import math
 import os
 import re
@@ -363,6 +364,74 @@ def _embed_query(text: str, model: Optional[str] = None) -> Optional[List[float]
 # so an index rebuild is picked up on the next call (stress-test fix 13/24).
 _INDEX_CACHE: Dict[str, Any] = {}
 
+# ── Lexical scan cache ──────────────────────────────────────────────────────
+# Every search re-read, re-decoded and re-lowercased every note, then recomputed
+# the per-note values that do not depend on the query at all: length norm, type
+# weight, stale-status fade and age. Measured on a ~2,900-note vault, a lexical
+# search is 0.62s of which roughly 0.2s is file I/O - so this is a useful win
+# rather than a transformational one, and worth saying plainly. It matters most
+# where searches run back to back: the eval harness does one per case, and
+# /obsidian-find is interactive.
+#
+# Deliberately NOT an inverted term index. Scoring uses `low.count(term)`, which
+# is substring matching - "run" matches "running" - so tokenizing would change
+# results, and the retrieval numbers in scripts/eval/BASELINE.md are the contract.
+# This caches the inputs to the existing scorer and changes no ranking.
+#
+# Keyed on (mtime_ns, size) so an edited note is re-read on the next search.
+# Bounded by total cached characters, evicting oldest-first, so a very large
+# vault degrades to the previous behaviour instead of growing without limit.
+_SCAN_CACHE: "OrderedDict[str, Any]" = OrderedDict()
+_SCAN_CACHE_MAX_CHARS = int(os.environ.get("OBSIDIAN_SCAN_CACHE_CHARS") or "40000000")
+_scan_cache_chars = 0
+
+
+def _scan_entry(md: Path, vault: Path):
+    """Per-note scan inputs, cached until the file changes.
+
+    Returns (lowercased_text, title_low, length_norm, static_weight) or None when
+    the file is unreadable. `static_weight` folds together every query-independent
+    multiplier: de-weight prefix, type weight and stale-status fade.
+    """
+    global _scan_cache_chars
+    key = str(md)
+    try:
+        st = md.stat()
+        stamp = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+    hit = _SCAN_CACHE.get(key)
+    if hit is not None and hit[0] == stamp:
+        _SCAN_CACHE.move_to_end(key)
+        return hit[1]
+
+    text = _read_safe(md, limit=_MAX_FILE_BYTES)
+    if not text:
+        return None
+    low = text.lower()
+    rel = md.relative_to(vault).as_posix()
+    weight = 1.0
+    if rel in _SEARCH_DEWEIGHT_FILES or rel.startswith(_SEARCH_DEWEIGHT_PREFIXES):
+        weight *= _SEARCH_DEWEIGHT_FACTOR
+    else:
+        weight *= _type_weight(rel, text)
+    sm = _STATUS_RE.search(text[:400])
+    if sm and sm.group(1).lower() in _STALE_STATUSES:
+        weight *= _STATUS_FADE
+    entry = (low, md.stem.lower(), 1.0 + math.log1p(len(low) / 1000.0), weight,
+             _note_age_days(text, md), text)
+
+    if hit is not None:
+        _scan_cache_chars -= len(hit[1][0])
+    _SCAN_CACHE[key] = (stamp, entry)
+    _SCAN_CACHE.move_to_end(key)
+    _scan_cache_chars += len(low)
+    while _scan_cache_chars > _SCAN_CACHE_MAX_CHARS and len(_SCAN_CACHE) > 1:
+        _, old = _SCAN_CACHE.popitem(last=False)
+        _scan_cache_chars -= len(old[1][0])
+    return entry
+
 
 def _load_index_cached(index_path: Path) -> dict:
     st = index_path.stat()
@@ -474,17 +543,15 @@ def search(query: str, *, limit: int = 6, semantic: Optional[bool] = None) -> Li
         if i >= _MAX_FILES_SCANNED:
             truncated = True
             break
-        text = _read_safe(md, limit=_MAX_FILE_BYTES)
-        if not text:
+        entry = _scan_entry(md, vault)
+        if entry is None:
             continue
-        low = text.lower()
-        title_low = md.stem.lower()
+        low, title_low, length_norm, static_weight, age_days, text = entry
         # Sublinear term frequency + length normalization (BM25-style): a note that
         # repeats a term 50 times in passing should not outrank a short note that has
         # the term in its title. log1p saturates repeated mentions; dividing the body
         # contribution by a length factor stops long notes winning on sheer volume.
         # Title matches stay a strong, length-independent signal.
-        length_norm = 1.0 + math.log1p(len(low) / 1000.0)
         title_score = 0.0
         body_score = 0.0
         for t in terms:
@@ -499,14 +566,10 @@ def search(query: str, *, limit: int = 6, semantic: Optional[bool] = None) -> Li
         )
         if score:
             rel = md.relative_to(vault).as_posix()
-            if rel in _SEARCH_DEWEIGHT_FILES or rel.startswith(_SEARCH_DEWEIGHT_PREFIXES):
-                score *= _SEARCH_DEWEIGHT_FACTOR
-            else:
-                score *= _type_weight(rel, text)
-            sm = _STATUS_RE.search(text[:400])
-            if sm and sm.group(1).lower() in _STALE_STATUSES:
-                score *= _STATUS_FADE
-            score *= _freshness_weight(_note_age_days(text, md), current_intent)
+            # static_weight folds the de-weight prefix, type weight and stale
+            # status; all three are query-independent and cached with the note.
+            score *= static_weight
+            score *= _freshness_weight(age_days, current_intent)
             scored.append(
                 {
                     "path": rel,
