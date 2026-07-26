@@ -795,6 +795,17 @@ def main():
         print(json.dumps(result, indent=2, default=str))
     else:
         print_report(result)
+        # Only on a clean run, and only ever once. A tool asking for a favour
+        # right after reporting problems it found in your vault has the tone
+        # exactly backwards.
+        if result["total_issues"] == 0 and result["total_notes"] > 0:
+            try:
+                from star_prompt import maybe_ask
+                maybe_ask(
+                    f"Clean bill of health across {result['total_notes']} notes."
+                )
+            except Exception:
+                pass  # a growth prompt must never be able to fail a health check
 
 
 if __name__ == "__main__":
