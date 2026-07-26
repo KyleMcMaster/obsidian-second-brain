@@ -69,8 +69,8 @@ re-testing at a different layer against the set it had never seen.
 
 Hypothesis: RU/ES misses are not ranking failures but the canonical note losing
 to a longer log about the same topic. Inspecting all 6 misses supports that -
-the query for `Codru.md` returns `2026-06-27 - codru-team-second-brain-pos...`,
-a log. The lexical arm already applies a type weight, but a Russian or Spanish
+the query for a project note returns a dated research write-up about that same
+project, a log. The lexical arm already applies a type weight, but a Russian or Spanish
 query shares no terms with an English note, so that arm contributes nothing and
 the fused rank is effectively pure cosine with no type awareness.
 
@@ -102,10 +102,10 @@ stage surfaces, not how the results are ordered.
 
 O2 asked why 19 of 35 EN paraphrase cases are missed or buried below rank 3.
 Inspecting them shows the opposite pattern to the multilingual set: here an
-ENTITY note wins when the answer lives in a log or concept note. "What fix
-resolved the ClickFlow issue for Hailey" returns `Hailey Ingeman.md` rather than
-the daily log recording the fix; "what process does Eric recommend" returns
-`Eric Siu.md` rather than the concept note.
+ENTITY note wins when the answer lives in a log or concept note. A query of the
+shape "what fix resolved <issue> for <person>" returns that person's dossier
+rather than the daily log recording the fix; "what process does <person>
+recommend" returns the dossier rather than the concept note.
 
 That points straight at `_SEARCH_ENTITY_BOOST` (1.5) and `_SEARCH_LOG_WEIGHT`
 (0.5). Both are env-tunable, so the sweep needed no code change.
@@ -139,3 +139,103 @@ have been:
 
 **O2 therefore reduces to the same open problem as O1**: the gold note is not in
 the candidate pool, and nothing downstream of retrieval can put it there.
+
+---
+
+## O1 resolved: the multilingual gap is not a multilingual problem (2026-07-26)
+
+O1 read the RU/ES set's `recall@5 == recall@10 == 0.625` as a cross-language
+recall failure and called it the highest-value retrieval target. Measured
+end-to-end, that diagnosis was wrong in three separate ways.
+
+### The index was 29% stale, and that is a real bug the benchmark did not catch
+
+The vault held 1,828 notes; the semantic index held 1,303. 524 of the 525
+missing notes had been modified after the index was last written. Nothing warned
+about it - the index never invalidates itself and the README said to build it
+"once".
+
+That matters more for non-English queries than the numbers here suggest. On this
+case set every single hit came from the semantic arm; the lexical rank of the
+target note was absent or in the hundreds. So an unindexed note is not "ranked
+lower" for these queries, it is unretrievable. Search and `/obsidian-health` now
+report coverage.
+
+Rebuilding to 1,828/1,828 changed the score not at all - RU/ES `recall@10` stayed
+0.625. Every target in this case set was already indexed, so the benchmark was
+blind to a defect that costs real users whole notes. Worth remembering before
+treating a flat score as evidence that nothing is wrong.
+
+### The same three concepts fail in every language
+
+The six misses are not six cases. They are three concepts, each asked once in
+Russian and once in Spanish. If cross-language alignment were the problem, RU
+and ES would fail on different concepts.
+
+Asking the same three in English, translated faithfully:
+
+| concept | RU rank | ES rank | EN rank |
+|---|---|---|---|
+| A | 198 | 171 | 176 |
+| B | 54 | 27 | 22 |
+| C | 153 | 12 | 38 |
+
+English does not rescue any of them, and makes one materially worse. These notes
+are hard to retrieve semantically in any language, and "RU/ES recall" was the
+wrong frame - the set simply happens to contain three hard concepts, each
+counted twice.
+
+### No weighting can reach them, and here is the number that proves it
+
+For each miss, how far below the rank-10 cutoff the target sits:
+
+| case | target cosine | rank-10 cosine | lift needed | notes ranked above |
+|---|---|---|---|---|
+| 5  | 0.5059 | 0.5773 | 0.0714 | 197 |
+| 6  | 0.5408 | 0.5802 | 0.0393 | 53 |
+| 7  | 0.5535 | 0.5956 | 0.0421 | 152 |
+| 13 | 0.4480 | 0.5055 | 0.0575 | 170 |
+| 14 | 0.5567 | 0.5822 | 0.0255 | 26 |
+| 15 | 0.5663 | 0.5753 | 0.0090 | 11 |
+
+The whole rank-1-to-rank-10 band is 0.02 to 0.04 cosine wide. Four of these six
+need a lift larger than that entire band. Any per-note weight big enough to fix
+case 5 would reorder the top 10 of every other query in the vault. This is the
+ceiling on the whole family of weighting fixes, and it is why five separate
+attempts all failed:
+
+1. Type weighting on raw cosine (fix 13/24) - recall halved.
+2. Type weighting at the fusion layer - worse on all three sets.
+3. Entity/log weight sweep, 6 configs - best bought 1 case of 35.
+4. Chunk-scoring variants, 7 of them (mean, top-2 mean, 0.7max+0.3mean, and
+   three chunk-count penalties) - no variant was Pareto-positive. The count
+   penalties help EN paraphrase (`max/(1+0.05*ln k)`: r@10 0.743 -> 0.829) and
+   hurt RU/ES (0.625 -> 0.562). `0.7max+0.3mean` and `top2 mean` each buy one
+   RU/ES case and cost MRR everywhere.
+5. Rocchio pseudo-relevance feedback, 9 configs of alpha x k - best (a=0.7,
+   k=10) buys one RU/ES case at r@5 and one at r@10, costs one EN paraphrase
+   case at r@5, and drops EN keyword MRR 0.825 -> 0.786.
+
+Defaults left unchanged. Each of these is one or two cases on a 16-case set,
+which is noise, and the honest reading of the table above is that the targets
+are not near the cut in the first place.
+
+### What the misses actually are
+
+Inspected: in each case the target is the canonical note and the notes above it
+are derivative material genuinely about the same subject - research write-ups on
+the project, meeting notes on the topic, article collections by the person. For
+at least one of the three, several notes ranked above the target are defensible
+answers to the question as asked. Single-gold scoring cannot express that, so
+part of this residual is the benchmark's shape rather than the retrieval's
+quality. Adjusting gold sets to raise one's own score is not a fix, so the cases
+are left as they are and the limitation is recorded here instead.
+
+### Shipped instead
+
+`scripts/eval/diagnose.py`, which classifies each miss as coverage (no vector),
+pool (below fusion depth in both arms), or ordering (in the pool, ranked out),
+and with `--gap` reports the cosine lift a fix would have to supply. The four
+weighting experiments above were run against cases that no weight could move;
+one run of this tool would have shown that first. Output carries rank numbers
+only, so a run against a private vault is safe to share.
