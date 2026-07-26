@@ -50,3 +50,19 @@ jobs:
       #   uv run python scripts/build_site.py
       - name: Verify the docs site is current
         run: python scripts/build_site.py --check
+
+      # The Obsidian plugin is a second implementation of AI-FIRST.md, in a
+      # second language, so it needs its own gate. A linter's failure mode is
+      # false positives, and most of these tests are about not firing.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: integrations/obsidian-plugin/package-lock.json
+
+      - name: Obsidian plugin - typecheck, build and test
+        working-directory: integrations/obsidian-plugin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npm test
