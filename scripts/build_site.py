@@ -147,9 +147,10 @@ def render_index(cmds: list[dict]) -> str:
 
     parts = [
         "<h1>obsidian-second-brain</h1>",
-        f'<p class="lede">{len(cmds)} commands that turn an Obsidian vault into a '
-        "second brain an AI agent can actually read, search and write to. "
-        "Every command works by plain language, in English, Spanish or Portuguese.</p>",
+        f'<p class="lede">Your AI agent starts every session knowing nothing about '
+        f"you. These {len(cmds)} commands give it long-term memory across "
+        "sessions, kept as plain markdown in your own Obsidian vault. Every one works "
+        "by plain language, in English, Spanish or Portuguese.</p>",
         '<input type="search" id="q" placeholder="Filter commands..." '
         'aria-label="Filter commands">',
     ]
@@ -207,11 +208,19 @@ def build(out: Path, cmds: list[dict]) -> dict[str, str]:
         # GitHub Pages runs Jekyll by default, which would try to process these
         # and skip anything it thinks is a draft. This turns that off.
         ".nojekyll": "",
+        # Title and description are written in the words people actually search
+        # with ("persistent memory", "across sessions"), not the words the project
+        # uses for itself ("cross-CLI skill", "45 commands"). Repos with a fraction
+        # of the stars outrank this one on those queries purely by saying the
+        # problem out loud. Same claims either way; only the ordering changed.
         "index.html": page(
-            "obsidian-second-brain - 45 commands for an AI-first Obsidian vault",
-            "Turn any Obsidian vault into a second brain your AI agent can read, "
-            "search and write to. 45 slash commands, plain-language triggers in "
-            "English, Spanish and Portuguese.",
+            "Persistent memory for Claude Code, in your Obsidian vault "
+            "- obsidian-second-brain",
+            "Give Claude Code and six other CLI agents long-term memory across "
+            "sessions, stored as plain markdown in your own Obsidian vault. Stop "
+            "re-explaining your projects, decisions and people every time. 45 "
+            "commands, with plain-language triggers in English, Spanish and "
+            "Portuguese.",
             render_index(cmds),
         ),
     }

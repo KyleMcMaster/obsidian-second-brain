@@ -73,11 +73,11 @@
 
 ## The Problem
 
-You use Claude every day. Every session starts from scratch. You re-explain everything. The conversation ends. Everything disappears.
+You use Claude every day. Every session starts from scratch. You re-explain everything. The conversation ends. Everything disappears. Claude Code has no persistent memory across sessions, and neither does Codex, Gemini, or any of the others.
 
 You take notes in Obsidian. Hundreds of files. They just sit there. You make the same decision twice because you forgot you made it six months ago. Ideas rot in daily notes. Nobody connects the dots.
 
-**Two powerful tools. Completely disconnected.**
+**Two powerful tools. Completely disconnected.** You already have the long-term memory. The thing doing the thinking cannot reach it.
 
 ---
 
