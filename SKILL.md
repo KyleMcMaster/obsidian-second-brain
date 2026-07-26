@@ -339,6 +339,20 @@ These slash commands can be used in any Claude surface. Each one is smart - it r
 
 **Name matching:** If a name argument has a typo or is approximate, search the vault for the closest match, show what was found, and confirm with the user before proceeding. Never silently create a note with a misspelled name.
 
+**Command selection: the longest matching trigger wins.** Several triggers are prefixes of longer, more specific ones, so a shorter match is not evidence that the shorter command is the right one. Always check whether a longer trigger also matches before choosing.
+
+The five collisions that exist today, with the correct routing:
+
+| The user says | Route to | Not to | Why it matters |
+|---|---|---|---|
+| "remind me every month...", "track a recurring..." | `/obsidian-recurring` | `/obsidian-task` | A one-shot card never recurs, which is the whole point of the request |
+| "save this idea", "capture this" | `/obsidian-capture` | `/obsidian-save` | One small idea note, not a multi-subagent sweep across people, projects, tasks, decisions and boards |
+| "save this person", "remember this person" | `/obsidian-person` | `/obsidian-save` | A person note, not a full conversation sweep |
+| "synthesize what I know about X" | `/vault-deep-synthesis` | `/obsidian-synthesize` | One topic cross-referenced, not a whole-vault pattern scan |
+| "find unnamed patterns" | `/obsidian-emerge` | `/obsidian-synthesize` | Surfaces patterns for the user, does not write synthesis pages unasked |
+
+When two commands still look equally plausible after applying the rule, ask which one rather than guessing - the blast radii differ enormously, and `/obsidian-save` in particular writes across many files.
+
 ---
 
 ### `/obsidian-save`
