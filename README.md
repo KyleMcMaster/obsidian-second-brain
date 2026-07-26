@@ -886,7 +886,9 @@ Inspired by [Andrey Karpathy's LLM-Wiki](https://gist.github.com/karpathy/442a6b
 
 ## Contributing
 
-PRs welcome:
+**Want a specific place to start?** [Good first issues](https://github.com/eugeniughelbur/obsidian-second-brain/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) are scoped to name the exact files and lines, what to watch out for, and how big the change is. They range from adding trigger phrases in a language you speak (no Python at all) to a one-command lint fix to a new slash command. Comment on one to claim it.
+
+PRs welcome more generally:
 - New thinking tools
 - Note type schemas (habits, books, investments)
 - MCP integrations (Calendar, Linear, Slack)

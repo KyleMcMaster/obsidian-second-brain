@@ -4,6 +4,8 @@ Thanks for your interest in contributing! This skill exists because the people w
 
 This guide explains **how to contribute** so your work lands fast.
 
+**Looking for somewhere to start?** The [good first issues](https://github.com/eugeniughelbur/obsidian-second-brain/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) each name the exact files and lines, flag what to watch out for, and say how big the change is, so the "where do I even stand" part is already done. Comment on one to claim it. Adding trigger phrases in a language you speak needs no Python.
+
 ---
 
 ## Before you start
