@@ -91,5 +91,9 @@ else
 fi
 
 # Never ship Python bytecode into user vaults (stress-test fix 22/24).
-find dist -name "__pycache__" -type d -prune -exec rm -rf {} + 2>/dev/null || true
-find dist -name "*.pyc" -delete 2>/dev/null || true
+# Anchored to $REPO_ROOT, not the caller's cwd. scripts/update-vault-integration.sh
+# invokes build.sh by absolute path with no cd, so `find dist ...` resolved against
+# whatever directory the user was in, found nothing, and the `|| true` swallowed it -
+# then install_build copied the bytecode straight into the user's vault.
+find "$REPO_ROOT/dist" -name "__pycache__" -type d -prune -exec rm -rf {} + 2>/dev/null || true
+find "$REPO_ROOT/dist" -name "*.pyc" -delete 2>/dev/null || true

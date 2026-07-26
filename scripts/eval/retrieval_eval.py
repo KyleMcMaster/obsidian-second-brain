@@ -296,7 +296,15 @@ def evaluate(cases_path: Path, as_json: bool, mode: str = "lexical") -> int:
     label, search_fn = _searcher(mode)
     per_case: list[dict[str, Any]] = []
     for c in cases:
-        results = search_fn(c["q"])
+        try:
+            results = search_fn(c["q"])
+        except Exception as e:
+            # One bad case must not discard every case already scored. In
+            # semantic/hybrid mode embed() uses the full (1,3,8,15) retry ladder
+            # at 120s per attempt, so a slow backend can burn ~10 minutes here
+            # and then take the entire run down with it. Count it as a miss.
+            print(f"  case failed, counted as a miss: {c['q'][:60]!r}: {e}", file=sys.stderr)
+            results = []
         rank = _rank_of_gold(results, c.get("gold", []))
         top = results[0]["path"] if results else None
         per_case.append({

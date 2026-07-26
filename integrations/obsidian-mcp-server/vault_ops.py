@@ -611,7 +611,16 @@ def update_note(
 
     out = "---\n" + "\n".join(fm_lines).strip("\n") + "\n---\n\n" + new_body.lstrip("\n")
     _write_atomic(target, out)
-    return {"updated": rel, "set": sorted(fields.keys()), "appended": bool(append)}
+    out: Dict[str, Any] = {"updated": rel, "set": sorted(fields.keys()), "appended": bool(append)}
+    # Surface a retrieval-affecting change instead of making it silent: a status
+    # in _STALE_STATUSES multiplies this note's score in every future search.
+    new_status = str(fields.get("status", "")).strip().lower()
+    if new_status in _STALE_STATUSES:
+        out["faded"] = (
+            f"status '{new_status}' de-ranks this note in all future vault search "
+            f"(score x{_STATUS_FADE}). Set it only if the note no longer holds."
+        )
+    return out
 
 
 def validate_note(rel: str) -> Dict[str, Any]:

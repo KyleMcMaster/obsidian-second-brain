@@ -267,7 +267,7 @@ See `references/write-rules.md` for the complete guide. Summary:
 
 - **Links**: Use `[[Note Name]]` for internal links. Always link to people, projects, and jobs mentioned in a note.
 - **Dates**: ISO format (`YYYY-MM-DD`) in frontmatter. Human format (`March 24`) in body text.
-- **Naming**: `YYYY-MM-DD - Title.md` for dated notes. `Title.md` for evergreen notes. No special characters except `-` (em dash).
+- **Naming**: `YYYY-MM-DD - Title.md` for dated notes. `Title.md` for evergreen notes. No special characters except the ASCII hyphen `-`. Never an em dash (U+2014) or en dash (U+2013) in a filename: link matching compares stems literally, so `2026-07-26 - Title.md` will not resolve a `[[2026-07-26 - Title]]` link, producing an orphan and a dangling link in the same write. The write-time validator checks file CONTENT, not filenames, so nothing catches this for you.
 - **Status values**: `active` / `planning` / `completed` / `archived` / `on-hold` for projects. `in-progress` / `done` / `waiting` for tasks.
 - **Kanban**: Items follow the format `- [ ] 🔴 **Title** · @{YYYY-MM-DD}\n\tDescription [[Link]]`
 

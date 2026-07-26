@@ -265,7 +265,16 @@ def apply_loop(vault, max_fixes):
             print(f"  SKIPPED (not valid UTF-8, left untouched): {rel}")
             skip_rels.add(rel)
             continue
-        text, _ = _rewrite(text, link, new_stem)
+        text, n = _rewrite(text, link, new_stem)
+        if n == 0:
+            # vault_health's LINK_RE strips #anchors and |aliases, so a link
+            # reported as [[X]] can be [[X#Setup]] on disk and the exact-string
+            # rewrite matches nothing. Writing anyway produced identical bytes,
+            # counted a fix that never happened, then tripped the no-progress
+            # guard and abandoned every remaining safe fix in the run.
+            print(f"  SKIPPED (no literal [[{link}]] outside code in {rel})")
+            skip_rels.add(rel)
+            continue
         write_exact(path, text)
 
         _ex = load_vault_config(vault)

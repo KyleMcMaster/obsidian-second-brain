@@ -75,10 +75,16 @@ def obsidian_update_note(
     """Guarded edit of an EXISTING vault note (curator mode).
 
     Appends a section (`append`, optionally under a `## heading`) and/or merges
-    scalar frontmatter fields (`set_fields`, e.g. {"status": "done"}). Preserves
+    scalar frontmatter fields (`set_fields`, e.g. {"owner": "alex"}). Preserves
     the rest of the note verbatim, never creates a note, never touches list
     frontmatter like `tags:`, and refuses paths outside the vault. Stamps
     `updated` with today's date. To create a new note, use obsidian_save_note.
+
+    `status` is not a free-form label: the values superseded, declined,
+    rejected, archived, obsolete, cancelled, closed, parked, inactive and done
+    fade the note in every future vault search. Setting one is closer to
+    archiving than to labelling, so only set it when the note genuinely no
+    longer holds. The response echoes a `faded` field when it happens.
     """
     return json.dumps(
         vault_ops.update_note(path, append=append, heading=heading, set_fields=set_fields)
