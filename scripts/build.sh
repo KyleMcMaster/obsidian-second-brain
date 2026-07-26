@@ -75,6 +75,10 @@ build_one() {
   mkdir -p "$dist_dir"
 
   adapter_build "$REPO_ROOT" "$dist_dir"
+  # Credit ships inside the build, not only in adapters/OWNERS.md. Done here
+  # rather than in each adapter so claiming a platform stays a one-line edit to
+  # one table instead of a change to seven files.
+  append_owner_credit "$dist_dir" "$platform"
 
   success "$platform → dist/$platform/"
 }

@@ -391,3 +391,36 @@ emit_ai_first_rule() {
    external claim, sources verbatim, confidence levels where applicable.
 EOF
 }
+
+# owner_of <platform>
+# The claimed owner of a platform build, from the table in adapters/OWNERS.md,
+# or empty when unclaimed. OWNERS.md is the single source of truth so the table
+# a person edits and the credit that ships are never two separate edits.
+owner_of() {
+  local platform="$1" owners="${REPO_ROOT:-.}/adapters/OWNERS.md"
+  [[ -f "$owners" ]] || return 0
+  LC_ALL=C awk -v p="$platform" '
+    /<!-- owners:start -->/ { on = 1; next }
+    /<!-- owners:end -->/   { on = 0 }
+    on && /^\|/ {
+      # | platform | owner | previously |
+      split($0, f, "|")
+      gsub(/^[ \t]+|[ \t]+$/, "", f[2])
+      gsub(/^[ \t]+|[ \t]+$/, "", f[3])
+      if (f[2] == p && f[3] != "unclaimed" && f[3] != "Owner" && f[3] != "") { print f[3]; exit }
+    }
+  ' "$owners"
+}
+
+# append_owner_credit <dist_dir> <platform>
+# Ships the credit inside the artifact rather than only in a table in the repo.
+# A named owner on the install page a user actually reads is the whole incentive
+# the ownership model runs on; a row in a governance file nobody opens is not.
+append_owner_credit() {
+  local dst="$1" platform="$2" owner
+  owner="$(owner_of "$platform")"
+  [[ -n "$owner" ]] || return 0
+  [[ -f "$dst/INSTALL.md" ]] || return 0
+  printf '\n---\n\nThis build is maintained by %s. Issues specific to this platform are theirs to triage: https://github.com/eugeniughelbur/obsidian-second-brain/issues\n' \
+    "$owner" >> "$dst/INSTALL.md"
+}
