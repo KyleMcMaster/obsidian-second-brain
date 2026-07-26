@@ -32,8 +32,12 @@ _NOTES_DIR = "Inbox"
 # Canonical skip set for the WHOLE search stack: semantic_search.py imports it
 # and retrieval_eval.py consults it, so lexical scan, semantic index, and eval
 # all search the same universe (stress-test fix 10/24).
+# Mirrors scripts/vault_scan.BASE_EXCLUDE_DIRS. Kept as a literal because this
+# module ships standalone in the MCP server and must not import from scripts/.
+# tests/test_exclude_policy.py pins the two together so they cannot drift again.
 _SKIP_DIRS = {".obsidian", ".git", ".trash", "_trash", ".claude", "_export",
-              "templates", "node_modules"}
+              "templates", "node_modules", ".agents", ".codex", ".gemini",
+              ".opencode", "__pycache__"}
 
 # Directories no write tool may touch. `raw/` holds original sources the skill
 # treats as immutable, and `templates` needs to match the conventional capital-T

@@ -36,19 +36,18 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from vault_scan import BASE_EXCLUDE_DIRS  # noqa: E402
+
 TODAY = date.today()
-EXCLUDE_DIRS = {
-    ".obsidian",
-    ".trash",
-    "_trash",
-    ".git",
-    ".claude",
-    ".agents",
-    ".codex",
-    "_export",
-    "Templates",
-}
-FILE_INDEX_EXCLUDE_DIRS = EXCLUDE_DIRS - {"Templates"}
+# Shared base, see scripts/vault_scan.py. This module owns the user-facing
+# extension point (.vault-config.json via VaultExcludes); the base is the floor.
+EXCLUDE_DIRS = frozenset(d.lower() for d in BASE_EXCLUDE_DIRS)
+# The file index deliberately keeps Templates visible: a link pointing AT a
+# template should still resolve, even though templates are not scanned as notes.
+FILE_INDEX_EXCLUDE_DIRS = EXCLUDE_DIRS - {"templates"}
 EXCLUDE_ROOT_FILES = {"AGENTS.md", "INSTALL.md"}
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
 # A note whose entire body was accidentally saved inside a ```markdown code fence:
@@ -119,9 +118,13 @@ class VaultExcludes:
 
     def skip(self, parts, rel_posix) -> bool:
         """True if a vault path is excluded from the scan (hardcoded + user rules)."""
-        if any(p in EXCLUDE_DIRS for p in parts):
+        # Casefolded: the bootstrapper writes Templates/ while three sibling
+        # tools spelled it templates, so the same folder was skipped or scanned
+        # depending on which tool ran.
+        lowered = [str(p).lower() for p in parts]
+        if any(p in EXCLUDE_DIRS for p in lowered):
             return True
-        if self.dirs and any(p in self.dirs for p in parts):
+        if self.dirs and any(p in {d.lower() for d in self.dirs} for p in lowered):
             return True
         return any(rel_posix == pre or rel_posix.startswith(pre + "/") for pre in self.paths)
 

@@ -37,7 +37,14 @@ FM_RE = re.compile(r"^---\n(.*?)\n---\n?(.*)$", re.DOTALL)
 WIKILINK_RE = re.compile(r"(!?)\[\[([^\]]+)\]\]")
 # Compared lowercased; any folder ENDING in "templates" is also skipped (matching
 # vault_health.load_vault), so the canonical capital Templates/ stays out too.
-SKIP_DIRS = {".obsidian", "_export", ".git", ".trash", ".claude", "excalidraw"}
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from vault_scan import BASE_EXCLUDE_DIRS  # noqa: E402
+from vault_scan import EXPORT_ONLY_EXCLUDES  # noqa: E402
+# Base policy plus the one skip that is specific to exporting: drawings are
+# not exportable prose.
+SKIP_DIRS = frozenset(d.lower() for d in (*BASE_EXCLUDE_DIRS, *EXPORT_ONLY_EXCLUDES))
 # frontmatter fields that point at a real external asset -> OKF `resource`
 RESOURCE_KEYS = ("resource", "url", "source_url", "post-url", "post_url", "repo", "linkedin")
 

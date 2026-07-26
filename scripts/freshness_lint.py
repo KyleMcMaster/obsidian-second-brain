@@ -27,6 +27,11 @@ an optional .freshness.json at the root:
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from vault_scan import BASE_EXCLUDE_DIRS  # noqa: E402
+
 import argparse
 import json
 import re
@@ -228,8 +233,7 @@ def lint_file(path: Path, rel: str, cfg: dict, today: date) -> list[dict]:
     return findings
 
 
-SKIP_DIRS = {".git", ".obsidian", ".claude", ".codex", ".gemini", ".opencode",
-             "_export", "node_modules", "__pycache__", ".trash"}
+SKIP_DIRS = frozenset(d.lower() for d in BASE_EXCLUDE_DIRS)  # see scripts/vault_scan.py
 
 
 def lint_folder(root: Path, today: date | None = None) -> dict:
@@ -239,7 +243,7 @@ def lint_folder(root: Path, today: date | None = None) -> dict:
     findings: list[dict] = []
     for path in sorted(root.rglob("*.md")):
         parts = path.relative_to(root).parts
-        if any(part in SKIP_DIRS for part in parts):
+        if any(part.lower() in SKIP_DIRS for part in parts):
             continue
         if exempt and any("/".join(parts[:i + 1]) in exempt for i in range(len(parts) - 1)):
             continue

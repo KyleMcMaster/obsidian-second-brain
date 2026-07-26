@@ -23,6 +23,11 @@ Output: JSON with nodes, edges, and stats (top hubs, orphans, dangling links).
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+from vault_scan import BASE_EXCLUDE_DIRS  # noqa: E402
+
 import argparse
 import json
 import re
@@ -33,7 +38,7 @@ from pathlib import Path
 # Shared with the health check so the two tools cannot drift apart again.
 from vault_health import index_vault_files
 
-SKIP_DIRS = {".obsidian", ".git", ".trash", "_trash", ".claude", "_export", "templates", "node_modules"}
+SKIP_DIRS = frozenset(d.lower() for d in BASE_EXCLUDE_DIRS)  # see scripts/vault_scan.py
 
 
 def _skipped(parts) -> bool:
