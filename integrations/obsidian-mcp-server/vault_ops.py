@@ -244,6 +244,16 @@ _RRF_SEMANTIC_WEIGHT = float(os.environ.get("OBSIDIAN_RRF_SEMANTIC_WEIGHT") or "
 # entries vote demoted semantic answers. Lexical votes are capped to its
 # strongest few; semantic keeps the full fusion depth.
 _FUSE_LEX_DEPTH = int(os.environ.get("OBSIDIAN_RRF_LEX_DEPTH") or "25")
+# The semantic index is built on demand and never invalidates itself, so a note
+# written after the last build is invisible to the semantic arm. On English
+# queries the lexical arm covers for that; on a query in another language it
+# contributes nothing (measured: on the RU/ES case set every hit came from the
+# semantic arm, lexical rank was absent or in the hundreds), so an unindexed
+# note is simply unfindable. Found at 29% uncovered on a real vault, silently.
+# Warned, never auto-rebuilt: rebuilding mid-search would stall the query for
+# minutes, and the user may not want an embedding pass running unprompted.
+_INDEX_STALE_WARN_PCT = float(os.environ.get("OBSIDIAN_INDEX_STALE_WARN_PCT") or "5.0")
+_STALE_WARNED_FOR: Optional[str] = None
 
 # Bounds keep search fast and reads safe. The scan cap exists to stop a runaway
 # walk on pathological trees, NOT to slice a real vault: 10k covers personal
@@ -449,9 +459,57 @@ def _load_index_cached(index_path: Path) -> dict:
     return _INDEX_CACHE["index"]
 
 
+def index_coverage(vault: Path) -> Dict[str, Any]:
+    """How much of the vault the semantic index actually covers.
+
+    Shared by search (which warns) and vault_health (which reports), so the two
+    can never disagree about whether an index is current.
+    """
+    index_path = vault / _SEMANTIC_INDEX_FILE
+    if not index_path.exists():
+        return {"index": False, "scanned": 0, "indexed": 0, "missing": 0, "pct_missing": 0.0}
+    try:
+        notes = (_load_index_cached(index_path).get("notes") or {})
+    except Exception:
+        return {"index": False, "scanned": 0, "indexed": 0, "missing": 0, "pct_missing": 0.0}
+    scanned = {md.relative_to(vault).as_posix() for md in _iter_notes(vault)}
+    missing = len(scanned - set(notes))
+    return {
+        "index": True,
+        "scanned": len(scanned),
+        "indexed": len(notes),
+        "missing": missing,
+        "pct_missing": (100.0 * missing / len(scanned)) if scanned else 0.0,
+    }
+
+
+def _warn_if_index_stale(vault: Path, scanned: List[str], notes: Dict[str, Any]) -> None:
+    """Warn once per index version, using the paths search already walked.
+
+    Reuses the search loop's own scan rather than re-walking the vault, so the
+    check costs a set difference and cannot slow a query down.
+    """
+    global _STALE_WARNED_FOR
+    key = str(_INDEX_CACHE.get("key"))
+    if _STALE_WARNED_FOR == key or not scanned:
+        return
+    _STALE_WARNED_FOR = key
+    missing = len(set(scanned) - set(notes))
+    pct = 100.0 * missing / len(scanned)
+    if pct < _INDEX_STALE_WARN_PCT:
+        return
+    print(
+        f"warning: the semantic index covers {len(notes)} of {len(scanned)} notes; "
+        f"{missing} ({pct:.0f}%) are missing and will not be found by meaning, only "
+        f"by literal word match. Rebuild: uv run python scripts/eval/semantic_search.py "
+        f"--path \"<vault>\" --build (incremental - only new and changed notes re-embed).",
+        file=sys.stderr,
+    )
+
+
 def _semantic_fuse(
     query: str, lexical: List[Dict[str, Any]], vault: Path, limit: int,
-    enabled: Optional[bool] = None,
+    enabled: Optional[bool] = None, scanned: Optional[List[str]] = None,
 ) -> Optional[List[Dict[str, Any]]]:
     """Fuse lexical results with local semantic ranking via RRF. Returns None (so the
     caller uses pure lexical) whenever semantic is unavailable or anything fails.
@@ -466,6 +524,7 @@ def _semantic_fuse(
         notes = index.get("notes") or {}
         if not notes:
             return None
+        _warn_if_index_stale(vault, scanned or [], notes)
         # The query MUST be embedded with the model the index was built with -
         # vectors from different models live in different spaces (fix 16/24).
         qvec = _embed_query(query, model=index.get("model") or _EMBED_MODEL)
@@ -538,11 +597,15 @@ def search(query: str, *, limit: int = 6, semantic: Optional[bool] = None) -> Li
         semantic = False
     limit = max(1, min(int(limit), 20))
     scored: List[Dict[str, Any]] = []
+    # Every note the scan reached, scoring or not. The staleness check diffs
+    # this against the index for free rather than walking the vault a second time.
+    seen: List[str] = []
     truncated = False
     for i, md in enumerate(_iter_notes(vault)):
         if i >= _MAX_FILES_SCANNED:
             truncated = True
             break
+        seen.append(md.relative_to(vault).as_posix())
         entry = _scan_entry(md, vault)
         if entry is None:
             continue
@@ -585,7 +648,7 @@ def search(query: str, *, limit: int = 6, semantic: Optional[bool] = None) -> Li
             file=sys.stderr,
         )
     scored.sort(key=lambda r: r["score"], reverse=True)
-    fused = _semantic_fuse(query, scored, vault, limit, enabled=semantic)
+    fused = _semantic_fuse(query, scored, vault, limit, enabled=semantic, scanned=seen)
     if fused is not None:
         return _freshness_rerank(fused, vault, current_intent)
     for r in scored:

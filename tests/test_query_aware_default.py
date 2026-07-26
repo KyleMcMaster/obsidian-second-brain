@@ -34,7 +34,11 @@ def vault(tmp_path, monkeypatch):
 def test_single_token_query_dispatches_to_lexical(vault, monkeypatch):
     seen = {}
 
-    def spy(query, lexical, v, limit, enabled=None):
+    # **_ absorbs arguments search passes that this double does not assert on
+    # (currently `scanned`, the already-walked path list the staleness check
+    # reuses). Pinning the full signature here made a test double a second
+    # definition of the production signature.
+    def spy(query, lexical, v, limit, enabled=None, **_):
         seen["enabled"] = enabled
         return None
 
@@ -46,7 +50,11 @@ def test_single_token_query_dispatches_to_lexical(vault, monkeypatch):
 def test_multi_word_query_keeps_fusion(vault, monkeypatch):
     seen = {}
 
-    def spy(query, lexical, v, limit, enabled=None):
+    # **_ absorbs arguments search passes that this double does not assert on
+    # (currently `scanned`, the already-walked path list the staleness check
+    # reuses). Pinning the full signature here made a test double a second
+    # definition of the production signature.
+    def spy(query, lexical, v, limit, enabled=None, **_):
         seen["enabled"] = enabled
         return None
 
@@ -58,7 +66,11 @@ def test_multi_word_query_keeps_fusion(vault, monkeypatch):
 def test_explicit_semantic_true_overrides_dispatch(vault, monkeypatch):
     seen = {}
 
-    def spy(query, lexical, v, limit, enabled=None):
+    # **_ absorbs arguments search passes that this double does not assert on
+    # (currently `scanned`, the already-walked path list the staleness check
+    # reuses). Pinning the full signature here made a test double a second
+    # definition of the production signature.
+    def spy(query, lexical, v, limit, enabled=None, **_):
         seen["enabled"] = enabled
         return None
 

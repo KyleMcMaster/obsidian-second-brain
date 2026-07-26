@@ -46,7 +46,11 @@ def test_semantic_toggle_reaches_fuse(vault, monkeypatch):
     seen = {}
     real = vault_ops._semantic_fuse
 
-    def spy(query, lexical, v, limit, enabled=None):
+    # **_ absorbs arguments search passes that this double does not assert on
+    # (currently `scanned`, the already-walked path list the staleness check
+    # reuses). Pinning the full signature here made a test double a second
+    # definition of the production signature.
+    def spy(query, lexical, v, limit, enabled=None, **_):
         seen["enabled"] = enabled
         return real(query, lexical, v, limit, enabled=enabled)
 

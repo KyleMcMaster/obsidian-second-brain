@@ -459,6 +459,77 @@ def check_empty_folders(vault: Path, excludes=None) -> list:
     return issues
 
 
+SEMANTIC_INDEX_FILE = ".obsidian-semantic-index.json"
+# A note key inside the index. Paths end in .md and every other string in the
+# file is a model name or a bare number, so this cannot match a vector element.
+_INDEX_KEY_RE = re.compile(r'"((?:[^"\\]|\\.)+?\.md)"\s*:\s*\{')
+# Below this share of the vault missing, an index is "current enough" - a couple
+# of notes written since the last build is normal, not a problem to report.
+INDEX_STALE_PCT = 5.0
+
+
+def _indexed_paths(index_path: Path, chunk: int = 1 << 20) -> set:
+    """Note paths present in the semantic index, read as a stream.
+
+    The index is vectors, so it runs to tens of megabytes on a real vault (66MB
+    at 1,300 notes). json.loads would make every health check pay for parsing
+    every float to answer a question about keys, so this scans in chunks with an
+    overlap wide enough that a key split across a boundary is still matched.
+
+    `chunk` is a parameter only so the seam behaviour can be tested deterministically
+    at a small size; at the default a note key cannot span two boundaries.
+    """
+    found = set()
+    tail = ""
+    with index_path.open("r", encoding="utf-8", errors="replace") as fh:
+        while block := fh.read(chunk):
+            buf = tail + block
+            found.update(m.group(1) for m in _INDEX_KEY_RE.finditer(buf))
+            tail = buf[-4096:]
+    return found
+
+
+def check_semantic_index(vault: Path, notes) -> list:
+    """Notes the semantic index does not cover.
+
+    The index is built on demand and never invalidates itself - the README even
+    said to "build the index once" - so it silently drifts behind the vault. A
+    missing note is still findable by literal word match, but nothing else: on a
+    query in a language the note is not written in, the lexical arm contributes
+    nothing and the note cannot be retrieved at all. Measured at 29% of a real
+    vault uncovered, with no warning anywhere.
+    """
+    index_path = vault / SEMANTIC_INDEX_FILE
+    if not index_path.exists():
+        return []  # semantic search is optional; not having it is not a defect
+    indexed = _indexed_paths(index_path)
+    if not indexed:
+        return [{
+            "type": "semantic_index",
+            "severity": "warning",
+            "message": (f"{SEMANTIC_INDEX_FILE} exists but no notes could be read from it; "
+                        "semantic search is falling back to literal word match"),
+            "files": [],
+        }]
+    missing = sorted(rel for rel in notes if rel not in indexed)
+    if not missing:
+        return []
+    pct = 100.0 * len(missing) / len(notes)
+    if pct < INDEX_STALE_PCT:
+        return []
+    return [{
+        "type": "semantic_index",
+        "severity": "warning",
+        "message": (
+            f"Semantic index covers {len(notes) - len(missing)} of {len(notes)} notes; "
+            f"{len(missing)} ({pct:.0f}%) are missing and can only be found by literal "
+            f"word match. Rebuild: uv run python scripts/eval/semantic_search.py "
+            f'--path "{vault}" --build'
+        ),
+        "files": missing[:20],
+    }]
+
+
 # Built from code points so the source stays ASCII and the non-ASCII sweep
 # (scripts/sweep_non_ascii.py) can never rewrite these operands again (#63).
 _EM_DASH, _EN_DASH = "\u2014", "\u2013"
@@ -644,6 +715,7 @@ def run_health_check(vault: Path) -> dict:
         ("Empty folders", check_empty_folders(vault, excludes)),
         ("Wanted notes", check_wanted_notes(notes, vault, excludes)),
         ("Template leftovers", check_template_leftovers(notes)),
+        ("Semantic index coverage", check_semantic_index(vault, notes)),
     ]
 
     all_issues = []

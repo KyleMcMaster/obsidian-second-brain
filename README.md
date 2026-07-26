@@ -794,10 +794,12 @@ Search (`/obsidian-find` and the MCP connector) works out of the box as fast key
 
 Two ways to provide the embedding model:
 
-- **Local + private (recommended), via [Ollama](https://ollama.com):** install Ollama, `ollama pull bge-m3`, then build the index once: `uv run python scripts/eval/semantic_search.py --path "<vault>" --build`. Your notes never leave the machine.
+- **Local + private (recommended), via [Ollama](https://ollama.com):** install Ollama, `ollama pull bge-m3`, then build the index: `uv run python scripts/eval/semantic_search.py --path "<vault>" --build`. Your notes never leave the machine. Re-run it as you write - see below.
 - **No Ollama? Any OpenAI-compatible endpoint.** Set `OBSIDIAN_EMBED_BACKEND=openai`, `OBSIDIAN_EMBED_URL=<base url>`, `OBSIDIAN_EMBED_MODEL=<model>`, and `OBSIDIAN_EMBED_KEY=<key if needed>`. This covers other local runtimes (LM Studio, llama.cpp's server) for free/private use, **or** a cloud API (OpenAI, a gateway) for top quality - note a cloud endpoint means note text leaves your machine, so use `OBSIDIAN_EMBED_EXCLUDE=<folder prefixes>` to keep private folders local-only.
 
-Knobs: `OBSIDIAN_SEARCH_SEMANTIC=0` disables the layer entirely; the index is rebuilt incrementally (only changed notes re-embed) so re-run `--build` occasionally as the vault grows. The index file is large and regenerable - gitignore it.
+**Keep it current.** The index does not update itself, and a note that is not in it can only be found by literal word match - which on a query in another language means it cannot be found at all. Re-run `--build` regularly; it is incremental, so only new and changed notes re-embed. `/obsidian-health` reports coverage, and search warns on stderr once the index falls more than 5% behind (tune with `OBSIDIAN_INDEX_STALE_WARN_PCT`).
+
+Knobs: `OBSIDIAN_SEARCH_SEMANTIC=0` disables the layer entirely. The index file is large and regenerable - gitignore it.
 
 ---
 
