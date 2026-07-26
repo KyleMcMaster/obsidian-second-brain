@@ -870,6 +870,8 @@ Command reference: https://eugeniughelbur.github.io/obsidian-second-brain/ - eve
 
 Retrieval benchmark: [scripts/eval/BENCHMARK.md](scripts/eval/BENCHMARK.md) - a reproducible 300-note synthetic corpus and three query sets, so the search numbers are something you can run yourself rather than something this README claims.
 
+The rule on its own: [AI-FIRST.md](AI-FIRST.md) - the note spec as a 50-line block you can paste into any `CLAUDE.md` or `AGENTS.md`. Installs nothing, works without this project, keep the attribution line.
+
 GitHub Issues: https://github.com/eugeniughelbur/obsidian-second-brain/issues. PRs welcome, see Contributing below.
 
 ---
