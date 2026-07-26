@@ -868,6 +868,8 @@ On Linux/macOS: nothing else to run - slash commands are symlinked so they pick 
 ### Where do I file issues or feature requests?
 Command reference: https://eugeniughelbur.github.io/obsidian-second-brain/ - every command, with the plain-language phrases that trigger it in English, Spanish and Portuguese.
 
+Retrieval benchmark: [scripts/eval/BENCHMARK.md](scripts/eval/BENCHMARK.md) - a reproducible 300-note synthetic corpus and three query sets, so the search numbers are something you can run yourself rather than something this README claims.
+
 GitHub Issues: https://github.com/eugeniughelbur/obsidian-second-brain/issues. PRs welcome, see Contributing below.
 
 ---
