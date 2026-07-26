@@ -66,8 +66,9 @@ the gap an owner fills.
 
 ## Claiming one
 
-Comment on the platform-owners issue saying which one, or open a PR editing the
-table above with your handle in the Owner column. Either is fine; the PR is
+Comment on [issue #171](https://github.com/eugeniughelbur/obsidian-second-brain/issues/171)
+saying which one, or open a PR editing the table above with your handle in the
+Owner column. Either is fine; the PR is
 faster.
 
 There is no interview and no track record required. Using the platform is the
