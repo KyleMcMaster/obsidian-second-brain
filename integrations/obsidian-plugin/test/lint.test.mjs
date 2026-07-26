@@ -165,3 +165,43 @@ test("sortFindings does not mutate its input", () => {
   sortFindings(r.findings);
   assert.deepEqual(r.findings.map((f) => f.path + f.rule), before);
 });
+
+test("a URL in frontmatter is a pointer, not an undated claim", () => {
+  // Every entity note in a real vault carries a `github:` or `url:` field. The
+  // freshness policy allows a pointer as one of its three legal forms, so
+  // flagging these made the linter fire on the whole vault at once.
+  const text = `---
+type: entity
+date: 2026-07-26
+tags:
+  - person
+ai-first: true
+github: "https://github.com/someone"
+---
+
+## For future Claude
+An entity note with no external claims in its body at all.
+`;
+  assert.ok(
+    !rules(text).includes("recency"),
+    "a github: field in frontmatter was reported as an undated external claim",
+  );
+});
+
+test("an undated claim in the body is still caught when frontmatter has a URL", () => {
+  const text = `---
+type: entity
+date: 2026-07-26
+tags:
+  - person
+ai-first: true
+github: "https://github.com/someone"
+---
+
+## For future Claude
+Body text.
+
+They raised a Series A, https://example.com/blog/series-a
+`;
+  assert.ok(rules(text).includes("recency"), "excluding frontmatter also disabled the body scan");
+});

@@ -111,7 +111,13 @@ export function lintNote(note: NoteInput): Finding[] {
     });
   }
 
-  const prose = withoutCodeBlocks(note.text);
+  // Frontmatter is metadata, not prose. A `github:` or `url:` field is a
+  // pointer to where truth lives, which the freshness policy explicitly allows
+  // as one of its three legal forms, so it needs no "as of" stamp. Scanning it
+  // made every entity note in a real vault report an undated claim, which is
+  // the false-positive rate that gets a linter switched off in a day.
+  const body = fm === null ? note.text : note.text.slice(FRONTMATTER.exec(note.text)![0].length);
+  const prose = withoutCodeBlocks(body);
   const cited = prose.split(/\r?\n/).filter((l) => URL_RE.test(l));
   const undated = cited.filter((l) => !RECENCY_RE.test(l));
   if (undated.length) {
