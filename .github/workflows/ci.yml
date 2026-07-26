@@ -43,3 +43,10 @@ jobs:
       #   uv run python scripts/conformance_report.py --write
       - name: Verify the conformance board is current
         run: python scripts/conformance_report.py --check
+
+      # docs/ is generated from commands/, so a command whose description or
+      # triggers changed without a site rebuild would ship a page that
+      # contradicts the command it documents. Regenerate with:
+      #   uv run python scripts/build_site.py
+      - name: Verify the docs site is current
+        run: python scripts/build_site.py --check
