@@ -97,3 +97,45 @@ entity boost recovers. Fix 13/24's conclusion holds at the fusion layer too.
 so for 6 of 16 cases the gold note never enters the candidate pool and no
 re-ranking can reach it. Whatever fixes it has to change what the retrieval
 stage surfaces, not how the results are ordered.
+
+## Swept and left alone: entity boost / log weight (2026-07-26)
+
+O2 asked why 19 of 35 EN paraphrase cases are missed or buried below rank 3.
+Inspecting them shows the opposite pattern to the multilingual set: here an
+ENTITY note wins when the answer lives in a log or concept note. "What fix
+resolved the ClickFlow issue for Hailey" returns `Hailey Ingeman.md` rather than
+the daily log recording the fix; "what process does Eric recommend" returns
+`Eric Siu.md` rather than the concept note.
+
+That points straight at `_SEARCH_ENTITY_BOOST` (1.5) and `_SEARCH_LOG_WEIGHT`
+(0.5). Both are env-tunable, so the sweep needed no code change.
+
+| entity / log | EN-para r@1 | r@5 | r@10 | MRR | misses |
+|---|---|---|---|---|---|
+| 1.5 / 0.5 (shipped) | 0.371 | 0.629 | 0.771 | 0.474 | 8 |
+| 1.0 / 0.5 | 0.371 | 0.629 | 0.771 | 0.481 | 8 |
+| 1.5 / 0.7 | 0.371 | 0.629 | 0.771 | 0.475 | 8 |
+| 1.2 / 0.7 | 0.371 | 0.629 | 0.771 | 0.482 | 8 |
+| 1.0 / 1.0 | 0.371 | 0.657 | 0.771 | 0.478 | 8 |
+| 1.0 / 0.3 | 0.314 | 0.629 | 0.771 | 0.452 | 8 |
+
+EN keyword and RU/ES were byte-identical across every setting tried.
+
+**Defaults unchanged.** The best variant buys one extra case out of 35 on r@5
+and 0.008 MRR. On a 35-case set that is noise, and moving a shipped default to
+chase it is overfitting to this eval, not improving retrieval.
+
+Two things the sweep did establish, which are worth more than the tuning would
+have been:
+
+1. **The type weights barely reach the fused result.** They apply to the lexical
+   arm only, and in default mode the semantic arm dominates - which is also why
+   the fusion-layer experiment above failed. Anyone reaching for these knobs to
+   fix a default-mode ranking is pulling a lever that is mostly disconnected.
+
+2. **The 8 misses are immovable by weighting.** The count is identical in all six
+   configurations, so those cases are recall failures like O1's, not ranking
+   failures. r@10 never moved either.
+
+**O2 therefore reduces to the same open problem as O1**: the gold note is not in
+the candidate pool, and nothing downstream of retrieval can put it there.
