@@ -65,7 +65,7 @@ _pi_emit_prompts() {
     name="$(basename "$f" .md)"
     desc="$(parse_frontmatter "$f" description)"
     [[ -z "$desc" ]] && desc="Run the /$name command of the obsidian-second-brain skill."
-    desc="${desc#\"}"; desc="${desc%\"}"
+    desc="$(strip_quotes "$desc")"
 
     out="$dst/$name.md"
     {
@@ -163,27 +163,9 @@ EOF
   ' "$out"
 }
 
-_pi_copy_references() {
-  local src="$1" dst="$2"
-  [[ -d "$src" ]] || return 0
-  mkdir -p "$dst"
-  cp -R "$src/." "$dst/"
-  find "$dst" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-    rewrite_tool_neutral "$f"
-    rewrite_platform_paths "$f" "${PI_SKILL_ROOT#.}"
-  done
-}
+_pi_copy_references() { copy_references_rewritten "$1" "$2" "${PI_SKILL_ROOT#.}"; }  # see adapters/lib.sh
 
-_pi_copy_scripts() {
-  local src="$1" dst="$2"
-  [[ -d "$src" ]] || return 0
-  mkdir -p "$dst"
-  cp -R "$src/." "$dst/"
-  # Ship the Python project next to the scripts so `uv run --directory <root>`
-  # can resolve both the module path and its dependencies. Every other adapter
-  # already does this; pi was the one build that shipped scripts with no project.
-  cp "$src/../pyproject.toml" "$(dirname "$dst")/pyproject.toml"
-}
+_pi_copy_scripts() { copy_scripts_with_project "$1" "$2"; }  # see adapters/lib.sh
 
 _pi_emit_install_hint() {
   local dst="$1"

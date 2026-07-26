@@ -104,7 +104,7 @@ _codex_emit_skills() {
     # Fold triggers into the description for implicit selection.
     if [[ -n "$triggers" ]]; then
       local trig_clean
-      trig_clean="$(echo "$triggers" | tr -d '[]"' | sed 's/,/, /g; s/  */ /g; s/^ *//; s/ *$//')"
+      trig_clean="$(format_triggers "$triggers")"
       [[ -n "$trig_clean" ]] && desc="$desc Triggers: $trig_clean."
     fi
 
@@ -126,26 +126,9 @@ _codex_emit_skills() {
   done
 }
 
-_codex_copy_references() {
-  local src="$1" dst="$2"
-  [[ -d "$src" ]] || return 0
-  mkdir -p "$dst"
-  cp -R "$src/." "$dst/"
-  find "$dst" -type f -name '*.md' -print0 | while IFS= read -r -d '' f; do
-    rewrite_platform_paths "$f" "$CODEX_DIR"
-  done
-}
+_codex_copy_references() { copy_references_rewritten "$1" "$2" "$CODEX_DIR"; }  # see adapters/lib.sh
 
-_codex_copy_scripts() {
-  local src="$1" dst="$2"
-  [[ -d "$src" ]] || return 0
-  mkdir -p "$dst"
-  cp -R "$src/." "$dst/"
-  # Ship the Python project next to the scripts so the documented
-  # `uv run -m scripts.research.<name>` actually resolves modules AND deps
-  # (stress-test fix 24/24: the dist shipped scripts with no project).
-  cp "$src/../pyproject.toml" "$(dirname "$dst")/pyproject.toml"
-}
+_codex_copy_scripts() { copy_scripts_with_project "$1" "$2"; }  # see adapters/lib.sh
 
 _codex_emit_install_hint() {
   local dst="$1"

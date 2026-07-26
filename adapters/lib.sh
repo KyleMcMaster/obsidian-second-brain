@@ -7,10 +7,6 @@
 # Do NOT execute directly.
 # =============================================================================
 
-# ── Vocabulary constants ────────────────────────────────────────────────────
-# Closed set of capabilities a command may declare (optional in Phase 1).
-CAPABILITY_VOCAB="read write edit bash webfetch websearch task todo"
-
 # ── Frontmatter parsing ─────────────────────────────────────────────────────
 
 # parse_frontmatter <file> <key>
@@ -77,16 +73,6 @@ should_include() {
     [[ "$t" == "$platform" ]] && return 1
   done
   return 0
-}
-
-# enumerate_commands <dir>
-# Echoes one command file path per line.
-enumerate_commands() {
-  local dir="$1"
-  [[ -d "$dir" ]] || return 0
-  for f in "$dir"/*.md; do
-    [[ -f "$f" ]] && echo "$f"
-  done
 }
 
 # ── Routing table emission (grouped by category) ────────────────────────────
@@ -336,4 +322,54 @@ rewrite_platform_paths() {
     s|\.claude/|.$d/|g;
     s~(^|[^A-Za-z0-9_./-])\.?/?references/~$1.$d/references/~g;
   ' "$file"
+}
+
+# ── Shared emit helpers ─────────────────────────────────────────────────────
+# These bodies were duplicated across adapters, which is how pi ended up as the
+# one build shipping scripts with no pyproject.toml beside them (B19) and how
+# the reference-copy step drifted into applying a different set of rewrites per
+# platform (S16). One definition, so a fix lands everywhere at once.
+
+# copy_scripts_with_project <src-scripts-dir> <dst-scripts-dir>
+# Copies the Python toolkit AND the uv project beside it. `uv run --directory
+# <root>` needs the project to resolve both the module path and dependencies.
+copy_scripts_with_project() {
+  local src="$1" dst="$2"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dst"
+  cp -R "$src/." "$dst/"
+  cp "$src/../pyproject.toml" "$(dirname "$dst")/pyproject.toml"
+}
+
+# copy_references_rewritten <src-refs-dir> <dst-refs-dir> <platform_dir>
+# Copies the shared specs and applies the same rewrites everywhere. Pass an
+# empty platform_dir for builds that ship references/ at their tree root.
+copy_references_rewritten() {
+  local src="$1" dst="$2" platform_dir="${3-}"
+  [[ -d "$src" ]] || return 0
+  mkdir -p "$dst"
+  cp -R "$src/." "$dst/"
+  local f
+  while IFS= read -r -d '' f; do
+    rewrite_tool_neutral "$f"
+    rewrite_platform_paths "$f" "$platform_dir"
+  done < <(find "$dst" -type f -name '*.md' -print0)
+}
+
+# format_triggers <raw-frontmatter-value>
+# Turns `["save this", "save the conversation"]` into `save this, save the
+# conversation`. Was copy-pasted byte-for-byte into three adapters.
+format_triggers() {
+  echo "$1" | tr -d '[]"' | sed 's/,/, /g; s/  */ /g; s/^ *//; s/ *$//'
+}
+
+# strip_quotes <value>
+# Frontmatter values may arrive single- or double-quoted. Four call sites
+# stripped a different subset, so the same description rendered clean on one
+# platform and garbled on another.
+strip_quotes() {
+  local v="$1"
+  v="${v#\"}"; v="${v%\"}"
+  v="${v#\'}"; v="${v%\'}"
+  printf '%s' "$v"
 }

@@ -40,23 +40,9 @@ _cc_copy_skill_manifest() {
   [[ -f "$src/SKILL.md" ]] && cp "$src/SKILL.md" "$dst/SKILL.md"
 }
 
-_cc_copy_references() {
-  local src="$1" dst="$2"
-  [[ -d "$src" ]] || return 0
-  mkdir -p "$dst"
-  cp -R "$src/." "$dst/"
-}
+_cc_copy_references() { copy_references_rewritten "$1" "$2" ""; }  # see adapters/lib.sh
 
-_cc_copy_scripts() {
-  local src="$1" dst="$2"
-  [[ -d "$src" ]] || return 0
-  mkdir -p "$dst"
-  cp -R "$src/." "$dst/"
-  # Ship the Python project next to the scripts so the documented
-  # `uv run -m scripts.research.<name>` actually resolves modules AND deps
-  # (stress-test fix 24/24: the dist shipped scripts with no project).
-  cp "$src/../pyproject.toml" "$(dirname "$dst")/pyproject.toml"
-}
+_cc_copy_scripts() { copy_scripts_with_project "$1" "$2"; }  # see adapters/lib.sh
 
 _cc_copy_hooks() {
   local src="$1" dst="$2"

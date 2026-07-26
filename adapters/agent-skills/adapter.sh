@@ -66,11 +66,11 @@ _ask_emit_skills() {
     [[ -z "$category" ]] && category="other"
     [[ -z "$desc" ]] && desc="Run the $name command of the obsidian-second-brain skill."
     # Strip any surrounding quotes the source may carry.
-    desc="${desc#\"}"; desc="${desc%\"}"; desc="${desc#\'}"; desc="${desc%\'}"
+    desc="$(strip_quotes "$desc")"
 
     # Fold English triggers into the description for implicit selection.
     if [[ -n "$triggers" ]]; then
-      trig_clean="$(echo "$triggers" | tr -d '[]"' | sed 's/,/, /g; s/  */ /g; s/^ *//; s/ *$//')"
+      trig_clean="$(format_triggers "$triggers")"
       [[ -n "$trig_clean" ]] && desc="$desc Triggers: $trig_clean."
     fi
 
