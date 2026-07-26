@@ -205,10 +205,18 @@ def index_vault_files(vault: Path, excludes=None) -> set:
     return files
 
 
-def load_vault(vault: Path, excludes=None) -> dict:
+def load_vault(vault: Path, excludes=None, only: str | None = None) -> dict:
+    """Parse every note under `vault` into {rel: note-dict}.
+
+    `only` restricts the walk to a single vault-relative path. heal_links
+    rewrites one file per iteration and previously re-read the entire vault to
+    learn about it; a full rglob to re-parse one note is the expensive part of
+    that loop. Same parsing path either way, so the two cannot drift.
+    """
     excludes = excludes or _NO_EXCLUDES
     notes = {}
-    for md in vault.rglob("*.md"):
+    source = [vault / only] if only else vault.rglob("*.md")
+    for md in source:
         parts = md.relative_to(vault).parts
         # Also skip any template folder (Templates, 20_Templates, ...): its
         # <%...%> Templater syntax is intentional, not a "template leftover" bug.
