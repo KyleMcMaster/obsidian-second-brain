@@ -47,10 +47,7 @@ import sys as _sys
 from pathlib import Path as _Path
 
 _sys.path.insert(0, str(_Path(__file__).resolve().parent))
-from vault_scan import (
-    BASE_EXCLUDE_DIRS,  # noqa: E402
-    EXPORT_ONLY_EXCLUDES,  # noqa: E402
-)
+from vault_scan import BASE_EXCLUDE_DIRS, EXPORT_ONLY_EXCLUDES  # noqa: E402
 
 # Base policy plus the one skip that is specific to exporting: drawings are
 # not exportable prose.

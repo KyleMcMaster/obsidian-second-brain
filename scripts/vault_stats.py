@@ -36,10 +36,7 @@ import sys as _sys
 from pathlib import Path as _Path
 
 _sys.path.insert(0, str(_Path(__file__).resolve().parent))
-from vault_scan import (
-    BASE_EXCLUDE_DIRS,  # noqa: E402
-    STATS_ONLY_EXCLUDES,  # noqa: E402
-)
+from vault_scan import BASE_EXCLUDE_DIRS, STATS_ONLY_EXCLUDES  # noqa: E402
 
 # Base policy plus raw/ and references/, which are real vault content but not
 # user notes for the purpose of counting.
