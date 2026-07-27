@@ -10,7 +10,7 @@
   "license": "MIT",
   "commands": "./commands/",
   "mcpServers": {
-    "obsidian-second-brain": {
+    "vault": {
       "command": "uv",
       "args": [
         "run",

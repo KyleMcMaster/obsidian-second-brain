@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- **MCP tool names carried the plugin name twice (#177, reported by @mpuglin).** The `mcpServers` key in `.claude-plugin/plugin.json` was also `obsidian-second-brain`, and Claude Code composes tool names as `mcp__plugin_<plugin>_<server>__<tool>` - so every tool arrived as `mcp__plugin_obsidian-second-brain_obsidian-second-brain__obsidian_search`, 57 characters of prefix of which 21 were the name repeated for nothing. In a dropdown or a permission prompt the prefix crowds out the part that identifies the tool. The server key is now `vault`, giving `mcp__plugin_obsidian-second-brain_vault__obsidian_search`. The plugin name, install identity, marketplace entry and slash-command namespace are all unchanged; the reported request was to rename the plugin itself to `o2b`, which was declined because the name is the install identity of the repository and the commands are already `obsidian-*`, so `o2b:obsidian-daily` would save little. **Upgrade note:** if you allowlisted these tools by their full name in `settings.json`, update the server segment from `obsidian-second-brain` to `vault`.
+
 ### Fixed
 
 - **Redacted vault note titles and a verbatim query from a tracked eval doc, and added a CI guard.** `scripts/eval/BASELINE.md` is public, is written while looking at real search output, and had picked up two note filenames and a quoted query from the maintainer's own vault - the second time this has happened in that file. The case files are gitignored, which makes the area feel safe and is exactly why the prose keeps leaking. `tests/test_no_vault_content_in_eval_docs.py` now fails when an eval doc backticks a `.md` filename that does not exist in this repository, or quotes a long string with no `<placeholder>` in it. The rule needs no list of real names, since keeping such a list would be its own leak.
