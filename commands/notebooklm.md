@@ -44,7 +44,7 @@ Use the obsidian-second-brain skill. Execute `/notebooklm [topic]`:
 
 ---
 
-**AI-first rule:** Every note created or updated by this command MUST follow `references/ai-first-rules.md`. The saved synthesis at `Research/NotebookLM/YYYY-MM-DD - <slug>.md` follows the template baked into the script (preamble, frontmatter, vault-baseline links, response verbatim). Do not strip those.
+**AI-first rule:** Every note created or updated by this command MUST follow `references/ai-first-rules.md`. If that path does not resolve from your working directory, search upward for it; if you still cannot read it, say so before writing rather than producing a note that silently skips the rule. The saved synthesis at `Research/NotebookLM/YYYY-MM-DD - <slug>.md` follows the template baked into the script (preamble, frontmatter, vault-baseline links, response verbatim). Do not strip those.
 
 **Anti-fabrication:** Search exhaustively before claiming any note, person, or file is absent - false absence is the most common failure mode - and never invent facts, entities, or dates (mark unknowns as `TBD`). See the anti-fabrication and search-completeness hard rules in `references/ai-first-rules.md`.
 

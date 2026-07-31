@@ -45,9 +45,22 @@ FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .args.file_path //
 [[ "$FILE" == *.md ]] || exit 0
 [[ -f "$FILE" ]] || exit 0
 
-# Only validate inside the configured vault
+# Only validate inside the configured vault. Environment wins; fall back to the
+# documented config .env, because a plugin-marketplace install configures the
+# vault there and never exports the variable - so an env-only check made this
+# hook a silent no-op for exactly the installs that need it most. Same root
+# cause as #160 (MCP server) and #124 (research toolkit); this is the third code
+# path, swept when the hook turned out never to have been wired at all.
 VAULT="${OBSIDIAN_VAULT_PATH:-}"
+if [[ -z "$VAULT" ]]; then
+  ENV_FILE="${OBSIDIAN_ENV_FILE:-$HOME/.config/obsidian-second-brain/.env}"
+  if [[ -r "$ENV_FILE" ]]; then
+    VAULT=$(sed -n 's/^[[:space:]]*OBSIDIAN_VAULT_PATH[[:space:]]*=[[:space:]]*//p' "$ENV_FILE" \
+      | tail -n 1 | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+  fi
+fi
 [[ -z "$VAULT" ]] && exit 0
+VAULT="${VAULT%/}"
 case "$FILE" in
   "$VAULT"/*) ;;
   *) exit 0 ;;

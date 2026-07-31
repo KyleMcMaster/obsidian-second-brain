@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 
 import tomllib
@@ -121,21 +122,42 @@ def test_no_documented_command_reinstalls_the_unpinned_mcp():
     command is duplicated across the manifest, setup.sh, SKILL.md, README.md and
     the integration's own docs - fixing one and missing another leaves a path
     that reinstalls the broken resolution."""
+    # Sweep tracked files only. An rglob walk also picks up gitignored local
+    # files - a maintainer's AUDIT.md, .claude/settings.local.json - which CI
+    # never sees, so the guard passed in CI and failed on the machine of anyone
+    # who had one. What ships is what is tracked.
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.split("\0")
+
     offenders = []
-    for path in REPO_ROOT.rglob("*"):
-        if not path.is_file() or path.suffix not in {".md", ".py", ".sh", ".json"}:
+    for rel in tracked:
+        if not rel or not rel.endswith((".md", ".py", ".sh", ".json")):
             continue
-        rel = path.relative_to(REPO_ROOT).as_posix()
-        if rel in UNPINNED_SWEEP_SKIP or rel.startswith((".git/", ".venv/")):
+        if rel in UNPINNED_SWEEP_SKIP:
+            continue
+        path = REPO_ROOT / rel
+        if not path.is_file():
             continue
         if UNPINNED_MCP_RE.search(path.read_text(encoding="utf-8", errors="ignore")):
             offenders.append(rel)
-    assert not offenders, f"unpinned `--with mcp` still documented in: {offenders}"
+    assert offenders == [], f"unpinned `--with mcp` still documented in: {offenders}"
 
 
 def test_plugin_hooks_reference_shipped_executable_scripts():
     hooks = _load("hooks/hooks.json")["hooks"]
-    assert set(hooks) == {"SessionStart", "PostCompact"}
+    # PostToolUse carries validate-ai-first.sh. It shipped in hooks/ but was
+    # never wired here, so the AI-first rule CLAUDE.md calls "enforced" was
+    # enforcing nothing on a plugin install (found by the claude-code owner,
+    # issue #171). Keep it in this set so an adapter refactor cannot drop it
+    # back out silently.
+    assert set(hooks) == {"SessionStart", "PostToolUse", "PostCompact"}
+    assert any(
+        "validate-ai-first.sh" in hook["command"]
+        for group in hooks["PostToolUse"]
+        for hook in group["hooks"]
+    ), "PostToolUse must wire validate-ai-first.sh - it is the write-time enforcement primitive"
     for event, groups in hooks.items():
         for group in groups:
             for hook in group["hooks"]:

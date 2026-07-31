@@ -112,7 +112,7 @@ The vault is designed for **future-Claude** to read and reason over, not for hum
 6. **Cross-links mandatory** - every person/project/idea/decision uses `[[wikilinks]]`
 7. **Confidence levels** - `stated | high | medium | speculation` where applicable
 
-This rule lives in `_CLAUDE.md` Section 0 of every vault using this skill, and in `references/ai-first-rules.md` (the canonical specification with frontmatter schemas + preamble templates per note type).
+This rule lives in `_CLAUDE.md` Section 0 of every vault using this skill, and in `references/ai-first-rules.md` (the canonical specification with frontmatter schemas + preamble templates per note type). That path is relative to the install root, which is load-bearing: if it does not resolve from your working directory, search upward for it, and if you still cannot read it, say so before writing rather than producing a note that silently skips the rule. The seven requirements above are the floor and apply whether or not the spec is reachable.
 
 ### Never create in isolation
 Every write operation must ask: *where else does this belong?*

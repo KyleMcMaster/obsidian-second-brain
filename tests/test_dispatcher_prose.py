@@ -84,13 +84,25 @@ def test_the_cited_path_exists_in_that_platforms_build(built, platform, dispatch
     doc = built / platform / dispatcher
     assert doc.is_file(), f"{platform} did not emit {dispatcher}"
 
-    text = doc.read_text(encoding="utf-8")
-    m = re.search(rf"{MARKER} \(`([^`]+)`\)", text)
-    assert m, f"{platform}'s dispatcher does not carry the rule summary"
+    # Collapse whitespace: the summary is prose emitted by a heredoc and wraps
+    # at whatever width that heredoc uses.
+    text = " ".join(doc.read_text(encoding="utf-8").split())
+    assert MARKER in text, f"{platform}'s dispatcher does not carry the rule summary"
+    m = re.search(r"The full spec is `([^`]+)`", text)
+    assert m, f"{platform}'s rule summary no longer cites the spec path"
 
     cited = (doc.parent / m.group(1)).resolve()
     assert cited.is_file(), (
         f"{platform}'s dispatcher points at {m.group(1)}, which does not exist "
         f"relative to {dispatcher}. The agent is told to follow a spec it "
         "cannot open."
+    )
+
+    # The path is relative, so it only resolves from one directory. That is the
+    # #171 class: it cannot be made absolute at build time, so the instruction
+    # must carry a recovery path and must fail loudly instead of silently.
+    assert "search upward" in text and "say so before writing" in text, (
+        f"{platform} cites a relative spec path with no recovery and no loud "
+        "failure. An agent started outside the install root would skip the "
+        "AI-first rule with nothing in the session saying so."
     )

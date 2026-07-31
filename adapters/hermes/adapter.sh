@@ -320,7 +320,11 @@ Then in Hermes:
 - Skills run in your Hermes session. The AI-first vault rule lives in
   `references/ai-first-rules.md` - it is non-negotiable for every note a skill
   writes (`## For future Claude` preamble, rich frontmatter, `[[wikilinks]]`,
-  recency markers, sources verbatim, confidence levels).
+  recency markers, sources verbatim, confidence levels). That path is relative
+  to the install root, which is load-bearing: start Hermes elsewhere and it does
+  not resolve. A skill that cannot read it must search upward for it, and say so
+  before writing if it still cannot - the requirements in parentheses are the
+  floor either way.
 - Python helpers under `scripts/` run via `uv run -m scripts.research.<name>`
   from the install directory (it ships a `pyproject.toml`, so modules and
   dependencies both resolve there - e.g. `~/.hermes/skills/obsidian-second-brain/`).

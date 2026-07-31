@@ -1096,3 +1096,61 @@ def test_recall_hook_contract(tmp_path):
     entries = [json.loads(l) for l in logs[0].read_text().splitlines()]
     assert any(e.get("abstained") is False for e in entries)
     assert any(e.get("abstained") is True for e in entries)
+
+
+def test_relative_reference_citations_are_not_silent():
+    """The relative-path class (issue #171, reported by the codex-cli owner).
+
+    Six of the seven builds cite the AI-first spec by a path relative to the
+    install root and ship no inline copy, so the pointer is the only route to
+    the spec. Start the agent anywhere but that root and the read fails - and
+    it fails silently, because an unreachable advisory reference does not stop
+    the skill from running.
+
+    `agent-skills` is exempt: it embeds the full spec in every SKILL.md ("so it
+    applies even on a partial install"), so an unresolvable pointer there costs
+    nothing. That is also why the fix for the other six is a recovery path plus
+    a loud failure rather than inline embedding - embedding 25KB into 45 skills
+    across 6 builds would buy the same guarantee at ~6.7MB of context.
+
+    `conformance_report.py` cannot catch this: it asserts the cited file exists
+    inside the build, which is true here. It has no concept of where the agent
+    is standing when it reads.
+    """
+    subprocess.run(
+        ["bash", "scripts/build.sh"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    )
+
+    dist = REPO_ROOT / "dist"
+    offenders = []
+    checked = 0
+    for path in sorted(dist.rglob("*.md")):
+        rel = path.relative_to(dist)
+        # The spec itself, and sibling reference docs, are the target of the
+        # citation rather than agent instructions that follow it.
+        if "references/" in rel.as_posix() or rel.name == "ai-first-rules.md":
+            continue
+        raw = path.read_text(encoding="utf-8", errors="ignore")
+        if "ai-first-rules.md" not in raw:
+            continue
+        # Builds that embed the spec inline cannot fail this way.
+        if "AI-first vault rule (embedded)" in raw:
+            continue
+        checked += 1
+        # Collapse whitespace: these clauses are prose and wrap across lines at
+        # whatever width the emitting heredoc happens to use.
+        text = " ".join(raw.split())
+        has_recovery = "search upward" in text
+        has_loud_failure = "say so before writing" in text
+        states_precondition = "load-bearing" in text
+        if not (has_recovery and has_loud_failure) and not states_precondition:
+            offenders.append(rel.as_posix())
+
+    assert checked, "no pointer-only file cited the spec - the sweep is vacuous"
+    assert not offenders, (
+        f"{len(offenders)} of {checked} pointer-only files cite the AI-first spec "
+        "by a relative path with no recovery and no loud failure, so an agent "
+        "outside the install root skips the rule silently:\n  "
+        + "\n  ".join(offenders[:15])
+    )

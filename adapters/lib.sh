@@ -382,14 +382,24 @@ strip_quotes() {
 # exist in their own build, and nobody noticed because each was maintained
 # separately. CLAUDE.md says this rule must change in lockstep across platforms;
 # one definition is what makes that true rather than aspirational.
+# emit_ai_first_rule <refs_path> [step_number]
+# The single home for the AI-first rule summary. step_number defaults to 3
+# because that is its slot in the "How to operate" block; agent-skills passes 4
+# for its global-rule snippet. Parameterised rather than copied, so
+# test_dispatcher_prose can keep asserting one definition exists.
 emit_ai_first_rule() {
-  local refs_path="$1"
+  local refs_path="$1" step="${2:-3}"
   cat <<EOF
-3. Treat the AI-first vault rule (\`${refs_path}\`) as
-   non-negotiable for every note you write: \`## For future Claude\` preamble,
-   rich frontmatter (\`type\`, \`date\`, \`tags\`, \`ai-first: true\`),
-   \`[[wikilinks]]\` for every person/project/concept, recency markers per
-   external claim, sources verbatim, confidence levels where applicable.
+${step}. Treat the AI-first vault rule as non-negotiable for every note you write:
+   \`## For future Claude\` preamble, rich frontmatter (\`type\`, \`date\`,
+   \`tags\`, \`ai-first: true\`), \`[[wikilinks]]\` for every
+   person/project/concept, recency markers per external claim, sources
+   verbatim, confidence levels where applicable. The full spec is
+   \`${refs_path}\`, a path relative to the install root. If it does not
+   resolve from your working directory, search upward for it. If you still
+   cannot read it, say so before writing - the seven requirements above still
+   apply, and a note written while the spec was unreachable must never look
+   the same as one written with it in hand.
 EOF
 }
 

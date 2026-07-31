@@ -163,8 +163,24 @@ Then in your vault:
   skills, plus a `pyproject.toml` making `.codex/` a self-contained uv project.
   Run them via `(cd .codex && uv run -m scripts.research.<name> ...)`.
 
-Start Codex CLI from the vault root. Skills run in your current session - no
-`codex exec` wrapper, no per-command startup, and writes honor your session's
-approval/sandbox mode.
+## Where you start Codex is load-bearing
+
+Start Codex CLI **from the vault root**, or have the vault under git. This is a
+requirement, not a convenience:
+
+- Codex walks up to the **git root** looking for `.agents/skills`. A git-backed
+  vault therefore works from any subfolder - all skills still register.
+- A plain Obsidian vault is not a git repo. In that case, opening Codex in any
+  subfolder registers **zero** skills. There is no warning and no error;
+  `/skills` is simply empty and the session behaves like stock Codex.
+- The `.codex/references/` paths the skills cite are relative to this root too.
+  Start elsewhere and the AI-first spec is a dead path.
+
+If you keep your vault outside git and want to work from subfolders, run
+`git init` in the vault root once. Reported by @Palo-Alto-AI-Research-Lab on
+codex-cli 0.144.4 (issue #171).
+
+Skills run in your current session - no `codex exec` wrapper, no per-command
+startup, and writes honor your session's approval/sandbox mode.
 EOF
 }
