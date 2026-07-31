@@ -99,6 +99,8 @@ _codex_emit_skills() {
     name="$(basename "$f" .md)"
     desc="$(parse_frontmatter "$f" description)"
     triggers="$(parse_frontmatter "$f" triggers_en)"
+    local trigmode
+    trigmode="$(parse_frontmatter "$f" trigger-mode)"
     [[ -z "$desc" ]] && desc="Run the $name command of the obsidian-second-brain skill."
 
     # Fold triggers into the description for implicit selection.
@@ -107,6 +109,10 @@ _codex_emit_skills() {
       trig_clean="$(format_triggers "$triggers")"
       [[ -n "$trig_clean" ]] && desc="$desc Triggers: $trig_clean."
     fi
+
+    # This build writes its own frontmatter, so a source trigger-mode does not
+    # travel unless it is encoded here (#181).
+    desc="$(with_trigger_policy "$desc" "$trigmode")"
 
     mkdir -p "$dst/$name"
     out="$dst/$name/SKILL.md"

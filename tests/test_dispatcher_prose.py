@@ -106,3 +106,50 @@ def test_the_cited_path_exists_in_that_platforms_build(built, platform, dispatch
         "failure. An agent started outside the install root would skip the "
         "AI-first rule with nothing in the session saying so."
     )
+
+
+# Builds that generate their own frontmatter, so a source `trigger-mode` only
+# reaches the model if the adapter encodes it. The other three (claude-code,
+# gemini-cli, opencode) copy the command body verbatim, frontmatter included,
+# so the field travels on its own and needs no encoding.
+GENERATED_DESC_PLATFORMS = ["codex-cli", "agent-skills", "hermes", "pi"]
+
+
+@pytest.mark.parametrize("platform", GENERATED_DESC_PLATFORMS)
+def test_generated_descriptions_carry_the_trigger_policy(built, platform):
+    """#181, reported by @konsone: hermes never read `trigger-mode`, so its
+    skills shipped purely reactive. It was encoded in agent-skills alone, which
+    left codex-cli and pi with the same gap - 7 of the 8 commands that declare
+    the field are proactive, so three builds lost the signal on all 7.
+
+    Nothing failed. The builds compiled, the skills loaded, and they simply
+    never volunteered - which is the defect class this repo keeps finding, and
+    the one CI has to hold rather than a reader.
+    """
+    src = REPO_ROOT / "commands"
+    proactive, explicit = [], []
+    for f in sorted(src.glob("*.md")):
+        text = f.read_text(encoding="utf-8")
+        m = re.search(r"^trigger-mode:\s*(\S+)\s*$", text, re.M)
+        if not m:
+            continue
+        (proactive if m.group(1) == "proactive" else explicit).append(f.stem)
+
+    assert proactive, "no command declares trigger-mode: proactive - fence is vacuous"
+
+    missing = []
+    for stem in proactive + explicit:
+        hits = [
+            p for p in (built / platform).rglob("*.md")
+            if stem in p.as_posix()
+        ]
+        if not hits:
+            continue  # excluded from this platform, which is legitimate
+        want = "Use proactively" if stem in proactive else "only when the user explicitly asks"
+        if not any(want in " ".join(p.read_text(encoding="utf-8").split()) for p in hits):
+            missing.append(f"{stem} (wanted: {want!r})")
+
+    assert not missing, (
+        f"{platform} generates its own description but drops the trigger-mode "
+        f"policy for:\n  " + "\n  ".join(missing[:10])
+    )

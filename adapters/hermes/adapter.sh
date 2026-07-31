@@ -83,6 +83,12 @@ _hermes_emit_skills() {
       [[ -n "$trig_clean" ]] && desc="$desc Triggers: $trig_clean."
     fi
 
+    # This build writes its own frontmatter, so a source trigger-mode does not
+    # travel unless it is encoded here (#181).
+    local trigmode
+    trigmode="$(parse_frontmatter "$f" trigger-mode)"
+    desc="$(with_trigger_policy "$desc" "$trigmode")"
+
     mkdir -p "$dst/$category/$name"
     out="$dst/$category/$name/SKILL.md"
     {

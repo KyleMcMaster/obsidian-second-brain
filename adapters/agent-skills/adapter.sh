@@ -75,11 +75,7 @@ _ask_emit_skills() {
     fi
 
     # Encode the selection policy - the one lever these harnesses read.
-    if [[ "$trigmode" == "proactive" ]]; then
-      desc="$desc Use proactively: trigger this whenever the conversation produces something worth capturing, without waiting to be asked."
-    else
-      desc="$desc Use only when the user explicitly asks for it."
-    fi
+    desc="$(with_trigger_policy "$desc" "$trigmode")"
 
     mkdir -p "$dst/$name"
     out="$dst/$name/SKILL.md"
