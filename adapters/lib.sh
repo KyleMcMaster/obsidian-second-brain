@@ -305,7 +305,10 @@ rewrite_tool_neutral() {
 # real paths shipped unrewritten. It is kept below as a cheap safety net.
 
 # Rewrite SKILL_ROOT to the directory holding scripts/ and references/.
-# Pass "." for builds that ship those at the tree root (hermes).
+# Pass a path that resolves from the working directory the platform actually
+# runs in, not from the built tree. `.` only works where the agent's CWD is the
+# install root; hermes points the agent at the vault instead, so it passes the
+# concrete install path (#191).
 rewrite_skill_root() {
   local file="$1" skill_root="$2"
   [[ -f "$file" ]] || return 0

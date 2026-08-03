@@ -92,6 +92,35 @@ def test_hermes_build_generates_native_skills():
     assert 'schedule: "0 22 * * *"' in blueprint
     # The opt-in arming surface, not the auto-loaded one.
     assert not (REPO_ROOT / "dist/hermes/skills/scheduled").exists()
+
+    # #190: the blueprints are hand-written here rather than derived from
+    # commands/, so they drifted out of the folder-map sweep. A hardcoded wiki/
+    # path is three tool failures a night on an Obsidian-style vault, with no
+    # interactive user around to notice.
+    # Naming `wiki/entities/` is fine and expected - as the wiki-style *default*,
+    # beside its Obsidian-style alias. What breaks an Obsidian vault is scanning it
+    # unconditionally, so the negative check is the bare imperative, not the path.
+    assert "references/folder-map.md" in blueprint
+    for alias in ("People/", "Knowledge/"):
+        assert alias in blueprint, alias
+    for unconditional in ("Scan `wiki/entities/`", "create `wiki/concepts/Synthesis"):
+        assert unconditional not in blueprint, unconditional
+
+    # #191: cron jobs are armed with --workdir <vault> and this adapter's own
+    # INSTALL.md points Hermes at the vault, so the working directory is never
+    # the skill root. Every Python invocation has to name the root itself.
+    health = REPO_ROOT / "dist/hermes/optional-skills/obsidian-health-check/SKILL.md"
+    health_text = health.read_text(encoding="utf-8")
+    # Anchored on "Run:" so the blueprint stays free to *name* the broken form
+    # when explaining why the flag is there.
+    assert "Run: `uv run --directory" in health_text
+    assert "Run: `uv run -m scripts." not in health_text
+    # A quoted tilde does not expand, so `--directory "~/..."` would hand uv a
+    # literal `~` directory. $HOME survives the double quotes commands write.
+    for md in (REPO_ROOT / "dist/hermes").rglob("*.md"):
+        text = md.read_text(encoding="utf-8", errors="ignore")
+        assert '--directory "."' not in text, md
+        assert '--directory "~' not in text, md
     hooks_doc = REPO_ROOT / "dist/hermes/HOOKS.md"
     assert hooks_doc.is_file()
     # The on_session_end lifecycle hook (PostCompact analog) and its config ship.
