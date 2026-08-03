@@ -312,7 +312,20 @@ def run_paid_deep(topic: str) -> int:
     try:
         # Use sonar-reasoning-pro for synthesis (follows instructions, supports markdown structure).
         # sonar-deep-research has a hardcoded "10k-word academic narrative" that overrides our prompt.
-        synth = perplexity.call(synth_prompt, model="sonar-reasoning-pro", max_tokens=3500, command="research-deep")
+        #
+        # 16000, measured rather than guessed. For a reasoning model max_tokens is
+        # the whole allowance, and the reasoning it spends is not itemized in
+        # `completion_tokens`, so the visible answer gets what is left. On a Phase 4
+        # prompt of ~4k tokens (this one carries the findings plus any Tavily
+        # full-text), a ladder on one fixed prompt gave: 3500/4000/4500/5000 ->
+        # completion_tokens 0, empty answer, finish_reason "stop"; 8000 -> answered
+        # but finish_reason "length" in 2 of 3 runs, arriving with 2 and 4 of the 6
+        # required sections; 16000 -> 3 of 3 complete, 6/6 sections, finish "stop".
+        # A bigger ceiling is close to free: billing is per token actually emitted
+        # (~2300 here, ~$0.032/run), so the cap costs nothing until it is used.
+        # Raise this, do not lower it - a prompt that grows past the allowance comes
+        # back empty rather than short.
+        synth = perplexity.call(synth_prompt, model="sonar-reasoning-pro", max_tokens=16000, command="research-deep")
     except Exception as e:
         # Same contract. Losing Phase 4 must not also discard the vault baseline
         # and every gap-fill result Phase 3 already paid for; write them through
