@@ -16,9 +16,20 @@ That is worse than a visible failure, which is what the guard makes it.
 
 from __future__ import annotations
 
+import os
+
 import pytest
 
-from scripts.research.lib import perplexity
+# Must run before the import below. `config.py` resolves OBSIDIAN_VAULT_PATH at
+# import time and raises SystemExit when it is unset, and importing perplexity
+# reaches it through usage.py. On a machine with no vault - which is every CI
+# runner - that SystemExit escapes during collection and takes down the whole
+# suite, not just this file: pytest reports INTERNALERROR and runs zero tests.
+# setdefault so a real local vault is never overridden. Nothing here touches the
+# filesystem; requests.post is stubbed in every test.
+os.environ.setdefault("OBSIDIAN_VAULT_PATH", "/nonexistent/vault-for-tests")
+
+from scripts.research.lib import perplexity  # noqa: E402
 
 
 class _FakeResponse:
