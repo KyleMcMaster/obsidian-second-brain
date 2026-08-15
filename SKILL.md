@@ -1284,9 +1284,9 @@ A non-blocking validator that fires after every `Write` or `Edit` on a markdown 
    }
    ```
 
-**Behavior:** Non-blocking. If a write fails the AI-first rule, Claude sees the warning text on stderr (with one line per missing requirement) and can re-write the file in the same conversation turn to fix it. The original write is NOT reverted.
+**Behavior:** Non-blocking. If a write fails the AI-first rule, the hook emits JSON with `systemMessage` (shown to the user) and `decision`/`reason` plus `additionalContext` (fed to the model), one line per missing requirement, with the warning mirrored to stderr for logs. The agent can re-write the file in the same conversation turn to fix it. The original write is NOT reverted.
 
-**Other platforms (Codex CLI / Gemini CLI / OpenCode):** The hook script ships in `dist/<platform>/hooks/` for all platform builds, but each platform's hook system differs. Wiring it up beyond Claude Code is left to the platform's own configuration. See [`hooks/validate-ai-first.hook.yaml`](hooks/validate-ai-first.hook.yaml) for the platform-neutral spec.
+**Other platforms (Codex CLI / Gemini CLI / OpenCode):** The hook ships only in the `claude-code` build (`dist/claude-code/hooks/`); the other platform builds do not include a `hooks/` directory. If your platform has a post-write hook system, wire it yourself from the source repo: [`hooks/validate-ai-first.hook.yaml`](hooks/validate-ai-first.hook.yaml) is the platform-neutral spec and `hooks/validate-ai-first.sh` the implementation. Without host wiring, the AI-first rule is enforced by the command instructions alone.
 
 ---
 
