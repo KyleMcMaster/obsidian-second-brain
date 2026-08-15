@@ -7,14 +7,14 @@
 # does not follow the AI-first rule defined in references/ai-first-rules.md.
 #
 # This is the write-time enforcement primitive: the vault stays AI-first
-# because every write is checked, not because future-Claude remembers all
+# because every write is checked, not because future agent remembers all
 # seven rules every time.
 #
 # Validation (warnings, non-blocking):
 #   1. Frontmatter delimiters (--- ... ---) are well-formed
 #   2. No tabs inside frontmatter (YAML requires spaces)
 #   3. Required AI-first fields present: date, type, tags, ai-first: true
-#   4. `## For future Claude` preamble exists in the body
+#   4. `## For future agent` preamble exists in the body
 #   5. No banned non-ASCII substitution characters (em/en-dashes, curly
 #      quotes, smart apostrophes, Unicode math). Reports codepoint +
 #      suggested ASCII replacement. Explicit ban list; anything not in
@@ -132,10 +132,10 @@ if ! printf '%s\n' "$FRONTMATTER" | grep -qE '^ai-first:[[:space:]]*true[[:space
   WARNINGS+=("$BASENAME missing 'ai-first: true' in frontmatter.")
 fi
 
-# ── Check 4: 'For future Claude' preamble in body ────────────────────────────
+# ── Check 4: 'For future agent' preamble in body ────────────────────────────
 BODY=$(awk '/^---$/{c++; if (c<2) next; next} c>=2' "$FILE")
-if ! printf '%s\n' "$BODY" | grep -qE '^##[[:space:]]+For future Claude' ; then
-  WARNINGS+=("$BASENAME missing '## For future Claude' preamble (required by ai-first-rules.md rule #2).")
+if ! printf '%s\n' "$BODY" | grep -qE '^##[[:space:]]+For future (agent|AI|Claude|Codex)[[:space:]]*$' ; then
+  WARNINGS+=("$BASENAME missing '## For future agent' preamble (required by ai-first-rules.md rule #2).")
 fi
 
 # ── Check 5: non-ASCII substitution characters ───────────────────────────────

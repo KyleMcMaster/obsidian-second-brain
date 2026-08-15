@@ -416,7 +416,7 @@ emit_ai_first_rule() {
   local refs_path="$1" step="${2:-3}"
   cat <<EOF
 ${step}. Treat the AI-first vault rule as non-negotiable for every note you write:
-   \`## For future Claude\` preamble, rich frontmatter (\`type\`, \`date\`,
+   \`## For future agent\` preamble, rich frontmatter (\`type\`, \`date\`,
    \`tags\`, \`ai-first: true\`), \`[[wikilinks]]\` for every
    person/project/concept, recency markers per external claim, sources
    verbatim, confidence levels where applicable. The full spec is

@@ -213,7 +213,7 @@ def test_agent_skills_build_generates_spec_compliant_tree():
     assert "$OBSIDIAN_VAULT_PATH" in save_text
     assert "Use the obsidian-second-brain skill. Execute `/obsidian-save`:" in save_text
     assert "## AI-first vault rule (embedded)" in save_text
-    assert "## For future Claude" in save_text
+    assert "## For future agent" in save_text
 
     # Non-capture commands get the explicit-only policy, not the proactive one.
     research = (skills_dir / "research/SKILL.md").read_text(encoding="utf-8")
@@ -403,7 +403,7 @@ def test_health_excludes_codex_support_directories(tmp_path):
     )
     (tmp_path / "Home.md").write_text(
         "---\ndate: 2026-07-10\ntype: home\ntags: [home]\nai-first: true\n---\n"
-        "## For future Claude\nThis is the test vault home.\n\n"
+        "## For future agent\nThis is the test vault home.\n\n"
         "# Home\n\nUse [[Templates/Daily Note]].\n",
         encoding="utf-8",
     )
@@ -490,7 +490,7 @@ def test_mcp_vault_ops_save_read_search_roundtrip(tmp_path, monkeypatch):
     note = (vault / rel).read_text(encoding="utf-8")
     assert "ai-first: true" in note
     assert "source: mcp" in note
-    assert "## For future Claude" in note
+    assert "## For future agent" in note
 
     read_back = vault_ops.read_note(rel)
     assert "Hermes agent" in read_back["content"]
@@ -806,7 +806,7 @@ def test_mcp_vault_ops_update_note_guarded_edit(tmp_path, monkeypatch):
     note = vault / "Project Alpha.md"
     note.write_text(
         "---\ntype: project\nstatus: active\ntags:\n  - work\nai-first: true\n---\n\n"
-        "## For future Claude\nAlpha.\n",
+        "## For future agent\nAlpha.\n",
         encoding="utf-8",
     )
 
@@ -837,7 +837,7 @@ def test_mcp_vault_ops_validate_and_backlinks_and_health(tmp_path, monkeypatch):
     monkeypatch.setenv("OBSIDIAN_VAULT_PATH", str(vault))
     (vault / "Home.md").write_text(
         "---\ntype: note\ndate: 2026-06-27\ntags:\n  - x\nai-first: true\n---\n\n"
-        "## For future Claude\nSee [[Project Alpha]] and [[Ghost Note]].\n",
+        "## For future agent\nSee [[Project Alpha]] and [[Ghost Note]].\n",
         encoding="utf-8",
     )
     (vault / "Project Alpha.md").write_text(
@@ -848,7 +848,7 @@ def test_mcp_vault_ops_validate_and_backlinks_and_health(tmp_path, monkeypatch):
     v = vault_ops.validate_note("Project Alpha.md")
     assert v["ok"] is False
     joined = " ".join(v["issues"])
-    assert "For future Claude" in joined
+    assert "For future agent" in joined
     assert "date" in joined  # missing required key
 
     bl = vault_ops.backlinks("Project Alpha")
@@ -1053,7 +1053,7 @@ def test_validate_hook_flags_secrets(tmp_path):
     naming a key by env-var NAME stays clean. High precision - prose about
     passwords is not a finding."""
     hook = REPO_ROOT / "hooks/validate-ai-first.sh"
-    frontmatter = "---\ntype: note\ndate: 2026-07-18\ntags: [t]\nai-first: true\n---\n\n## For future Claude\n\n"
+    frontmatter = "---\ntype: note\ndate: 2026-07-18\ntags: [t]\nai-first: true\n---\n\n## For future agent\n\n"
 
     leaky = tmp_path / "leaky.md"
     leaky.write_text(frontmatter + "key sk-test1234567890abcdefghijklmnop here\n", encoding="utf-8")

@@ -350,7 +350,7 @@ Then in Hermes:
   the task and let Hermes select a skill from its description.
 - Skills run in your Hermes session. The AI-first vault rule lives in
   `references/ai-first-rules.md` - it is non-negotiable for every note a skill
-  writes (`## For future Claude` preamble, rich frontmatter, `[[wikilinks]]`,
+  writes (`## For future agent` preamble, rich frontmatter, `[[wikilinks]]`,
   recency markers, sources verbatim, confidence levels). That path is relative
   to the install root, which is load-bearing: start Hermes elsewhere and it does
   not resolve. A skill that cannot read it must search upward for it, and say so

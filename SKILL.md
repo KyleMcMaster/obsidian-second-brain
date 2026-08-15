@@ -102,12 +102,12 @@ See `references/vault-schema.md` for full structural details.
 ## Core Operating Principles
 
 ### AI-first vault rule (applies to every note)
-The vault is designed for **future-Claude** to read and reason over, not for human review. Every note Claude writes - across all 46 commands - must follow `references/ai-first-rules.md`:
+The vault is designed for **future agent** to read and reason over, not for human review. Every note Claude writes - across all 46 commands - must follow `references/ai-first-rules.md`:
 
 1. **Self-contained context** - each note explains itself; don't rely on backlinks alone
-2. **"For future Claude" preamble** - 2-3 sentence summary so Claude can decide relevance in 10 seconds
+2. **"For future agent" preamble** - 2-3 sentence summary so any compatible agent can decide relevance in 10 seconds
 3. **Rich, consistent frontmatter** - `type`, `date`, `tags`, `ai-first: true`, plus type-specific fields (see `ai-first-rules.md` for schemas per note type)
-4. **Recency markers per claim** - "Mem0 raised $24M (as of 2026-04, mem0.ai)" so future-Claude knows what to verify
+4. **Recency markers per claim** - "Mem0 raised $24M (as of 2026-04, mem0.ai)" so future agent knows what to verify
 5. **Sources preserved verbatim** - every external claim has its source URL inline
 6. **Cross-links mandatory** - every person/project/idea/decision uses `[[wikilinks]]`
 7. **Confidence levels** - `stated | high | medium | speculation` where applicable
@@ -1244,13 +1244,13 @@ A background agent that fires automatically whenever Claude compacts the convers
 
 ## Write-Time AI-First Validator (PostToolUse Hook)
 
-A non-blocking validator that fires after every `Write` or `Edit` on a markdown file inside the configured vault. It warns when the file fails the AI-first rule (missing required frontmatter, missing `## For future Claude` preamble, broken YAML) and surfaces the warning back to Claude on stderr so the agent can repair the note in the same turn.
+A non-blocking validator that fires after every `Write` or `Edit` on a markdown file inside the configured vault. It warns when the file fails the AI-first rule (missing required frontmatter, missing `## For future agent` preamble, broken YAML) and surfaces the warning back to the active agent on stderr so it can repair the note in the same turn.
 
 **What it checks:**
 1. The file has frontmatter delimiters (`--- ... ---`)
 2. No tabs in frontmatter (YAML requires spaces)
 3. Required AI-first fields present: `date:`, `type:`, `tags:`, `ai-first: true`
-4. The body contains a `## For future Claude` preamble (rule #2 of [`references/ai-first-rules.md`](references/ai-first-rules.md))
+4. The body contains a `## For future agent` preamble (rule #2 of [`references/ai-first-rules.md`](references/ai-first-rules.md))
 
 **What it skips:**
 - Files outside `OBSIDIAN_VAULT_PATH`

@@ -124,7 +124,7 @@ model: {model}
 
 # {topic}: NotebookLM synthesis ({date})
 
-## For future Claude
+## For future agent
 
 Source-grounded synthesis on "{topic}" via Gemini File Search (model: {model}). Vault baseline: {baseline_count} notes from the vault scan, uploaded as grounded sources. Output cites source titles where the model included them. This is the parallel research track to `/research-deep` (Perplexity-based, open-web); this one is grounded in the user's own sources, not the open web. Confidence: stated (grounded retrieval is reliable on the sources you give it; less reliable on synthesis breadth).
 

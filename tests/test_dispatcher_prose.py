@@ -1,7 +1,7 @@
 """The AI-first rule summary must have exactly one definition.
 
 Four adapters each emit a "How to operate" block whose third step summarises the
-vault-write spec: the `## For future Claude` preamble, the required frontmatter
+vault-write spec: the `## For future agent` preamble, the required frontmatter
 keys, wikilinks, recency markers, sources, confidence. Until now each adapter
 carried its own hand-typed copy, differing only in the path it cites and in how
 the prose happened to be line-wrapped.
