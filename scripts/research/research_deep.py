@@ -18,12 +18,12 @@ is required either way.
 
 import json
 import os
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
 from .lib.config import VAULT_PATH
+from .lib.vault_terms import topic_terms
 
 MAX_BASELINE_NOTES = 8
 MAX_BASELINE_CHARS_PER_NOTE = 1500
@@ -38,7 +38,10 @@ def _vault_scan_dirs() -> list[str]:
 
 def vault_scan(topic: str) -> list[dict]:
     """Find vault notes whose path or content references the topic. Returns sorted hits."""
-    keywords = [w for w in re.split(r"\s+", topic.lower()) if len(w) > 2]
+    # Tokenize via the search tokenizer, never a private copy: the old
+    # whitespace split + len(w) > 2 here returned nothing for CJK topics and
+    # survived #159/#188/#192 because each fix landed elsewhere (issue #212).
+    keywords = topic_terms(topic)
     if not keywords:
         return []
     hits: list[dict] = []
