@@ -40,7 +40,25 @@ def test_topic_terms_is_cjk_aware():
     assert "habit" in en and "routine" in en
 
 
+def _ensure_genai_stub():
+    """notebooklm.py imports google.genai at module top for the File Search
+    flow; vault_scan never touches it. CI installs the base deps only, so
+    stub the package there rather than skipping the CJK regression test."""
+    try:
+        import google.genai  # noqa: F401
+        return
+    except ImportError:
+        pass
+    google_pkg = sys.modules.setdefault("google", types.ModuleType("google"))
+    genai = types.ModuleType("google.genai")
+    genai.types = types.ModuleType("google.genai.types")
+    google_pkg.genai = genai
+    sys.modules["google.genai"] = genai
+    sys.modules["google.genai.types"] = genai.types
+
+
 def test_vault_scan_finds_cjk_topic(tmp_path, monkeypatch):
+    _ensure_genai_stub()
     from research import notebooklm, research_deep
 
     vault = tmp_path / "vault"
