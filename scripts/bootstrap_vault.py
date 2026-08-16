@@ -1272,7 +1272,17 @@ def bootstrap(vault: Path, name: str, preset_key: str, mode: str, subject: str,
     print("   • Calendar  - daily note navigation")
     print("\n🤖 Claude MCP config:")
     print(f'   "obsidian-vault": {{"command": "npx", "args": ["-y", "mcp-obsidian", "{vault}"]}}')
-    print("\n🧠 _CLAUDE.md is ready - Claude will read it automatically on every session.")
+    # Auto-read is wiring, not a property of the file: it happens only when
+    # the load_vault_context SessionStart hook is registered (install.sh / the
+    # Claude Code plugin) AND OBSIDIAN_VAULT_PATH is set (scripts/setup.sh)
+    # AND the session starts inside the vault. Promising it unconditionally
+    # strands bare-clone users in sessions that never load the manual, with
+    # nothing telling them why.
+    print("\n🧠 _CLAUDE.md is ready. Make sure your agent reads it before working in")
+    print("   this vault - a configured integration may do that automatically (the")
+    print("   SessionStart hook from install.sh or the Claude Code plugin, plus")
+    print("   OBSIDIAN_VAULT_PATH from scripts/setup.sh, for sessions started")
+    print("   inside the vault).")
     # The one moment the reader has definitely just got value: their vault
     # exists and they can see what was created. Once per machine, never in CI.
     try:
