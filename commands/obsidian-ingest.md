@@ -69,6 +69,10 @@ The argument is a URL, file path, or pasted text. If no argument, ask what to in
    - **Quotes**: notable quotes worth preserving
 
 5. Save the raw source to `raw/` (immutable - never modify after saving):
+   - **Check for a previous ingest of this source first (#218).** Compute `content_hash` as the first 16 hex characters of the SHA-256 of the verbatim source text (`printf '%s' "$TEXT" | shasum -a 256 | cut -c1-16`). Then search `raw/` frontmatter for that `content_hash`, and for the same `source_url` (normalized: strip the scheme, `www.`, trailing slash and tracking parameters such as `utm_*`). Use Grep, not memory.
+     - Same hash found: the source is already in the vault byte-for-byte. Do not write a second raw note. Skip to step 6 and treat this run as a re-read: rewrite the vault from the existing raw note, and say in the report that the source was already ingested on the date in its frontmatter.
+     - Same URL, different hash: the source changed since it was last ingested. Write the new raw note, add `supersedes: "[[<old raw note>]]"` to its frontmatter, and in step 6 give the Contradictions agent the old raw note as well, because claims that came from the old version may now be stale.
+     - Neither found: this is the first ingest. Proceed.
    - Create `raw/articles/YYYY-MM-DD - Source Title.md` (or transcripts/, pdfs/, videos/)
    - Frontmatter: `type: source`, `date`, `tags: [source, <type>]`, `source_url`, `source_type`, `content_hash`, `ai-first: true` (the raw-source schema in `references/ai-first-rules.md`; the body stays verbatim - preamble not required)
 
@@ -116,6 +120,8 @@ The argument is a URL, file path, or pasted text. If no argument, ask what to in
    - **Synthesis pages created** (patterns that emerged from this + existing knowledge)
 
 The vault should be DIFFERENT after every ingest - not just bigger. Pages that existed before should be smarter, more connected, and more current. If an ingest only creates new pages and doesn't rewrite anything, it wasn't deep enough.
+
+**Ingesting many sources in one sitting?** Put the batch on a branch first so it can be reviewed or abandoned as one unit. The recipe (git and LiveSync) is under "Batch writes" in `references/write-rules.md`; there is no staging mode inside the command, by design, because a mode the command honors and the agent's own file tools do not would leave half a batch live.
 
 ---
 

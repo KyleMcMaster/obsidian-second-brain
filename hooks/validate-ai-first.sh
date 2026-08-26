@@ -19,6 +19,11 @@
 #      quotes, smart apostrophes, Unicode math). Reports codepoint +
 #      suggested ASCII replacement. Explicit ban list; anything not in
 #      the list passes.
+#   6. No secret material (API keys, private key blocks, quoted passwords)
+#   7. Every tag is valid Obsidian tag syntax. Obsidian renders a bad tag
+#      struck through with no error anywhere, so an agent never learns it
+#      wrote one (#221). Rules: letters, digits, `_`, `-`, `/` only; no
+#      spaces or dots; at least one character that is not a digit.
 #
 # Scope:
 #   - Only inspects files inside OBSIDIAN_VAULT_PATH (env var)
@@ -219,6 +224,75 @@ PYEOF
     while IFS= read -r hit; do
       [[ -n "$hit" ]] && WARNINGS+=("$hit")
     done <<< "$SECRET_HITS"
+  fi
+fi
+
+# ── Check 7: Obsidian tag syntax ─────────────────────────────────────────────
+# Obsidian's rule: a tag may contain letters (any script), digits, `_`, `-` and
+# `/` for nesting, and must contain at least one non-numeric character. `33`,
+# `2.0`, `q3 2026` are all silently broken in the UI. Same rule as
+# scripts/vault_health.py check_tag_syntax - keep the two in step.
+if command -v python3 >/dev/null 2>&1; then
+  # The script arrives on stdin (python3 -), so the frontmatter goes in via the
+  # environment - piping it would be swallowed by the heredoc.
+  TAG_HITS=$(AI_FIRST_FRONTMATTER="$FRONTMATTER" python3 - <<'PYEOF'
+import os
+import re
+
+ALLOWED = re.compile(r"^[\w/-]+$")   # \w is Unicode-aware: letters, digits, underscore
+HAS_NON_DIGIT = re.compile(r"[^\d/]")
+
+
+def tags_from(frontmatter: str):
+    lines = frontmatter.splitlines()
+    for i, line in enumerate(lines):
+        m = re.match(r"^tags:\s*(.*)$", line)
+        if not m:
+            continue
+        rest = m.group(1).strip()
+        if rest.startswith("["):
+            inner = rest.strip("[]")
+            for t in inner.split(","):
+                t = t.strip().strip("'\"")
+                if t:
+                    yield t
+        elif rest:
+            yield rest.strip("'\"")
+        else:
+            for nxt in lines[i + 1:]:
+                lm = re.match(r"^\s+-\s*(.+?)\s*$", nxt)
+                if not lm:
+                    break
+                yield lm.group(1).strip().strip("'\"")
+        return
+
+
+def problem(tag: str):
+    t = tag.lstrip("#")
+    if not t:
+        return "empty tag"
+    if " " in t or "\t" in t:
+        return "contains whitespace (Obsidian cannot render it) - use `-` between words"
+    if "." in t:
+        return "contains `.` (Obsidian cannot render it) - use `-` or spell it out"
+    if not ALLOWED.match(t):
+        return "contains characters outside letters/digits/_/-// (Obsidian cannot render it)"
+    if not HAS_NON_DIGIT.search(t):
+        return "is digits only (Obsidian renders it struck through) - prefix a word, e.g. `store-" + t + "`"
+    return None
+
+
+for tag in tags_from(os.environ.get("AI_FIRST_FRONTMATTER", "")):
+    why = problem(tag)
+    if why:
+        print(f"    tag `{tag}` {why}")
+PYEOF
+  )
+  if [[ -n "$TAG_HITS" ]]; then
+    WARNINGS+=("$BASENAME has tags Obsidian will render broken (no error is ever shown for these):")
+    while IFS= read -r hit; do
+      [[ -n "$hit" ]] && WARNINGS+=("$hit")
+    done <<< "$TAG_HITS"
   fi
 fi
 

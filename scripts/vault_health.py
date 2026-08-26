@@ -613,6 +613,48 @@ def check_missing_frontmatter(notes: dict) -> list:
     return issues
 
 
+# Obsidian tag syntax (#221). A tag may contain letters in any script, digits,
+# `_`, `-` and `/` for nesting, and must contain at least one non-numeric
+# character. Anything else renders struck through in the UI with no error
+# anywhere, so an agent that wrote `tags: [33]` or `[2.0]` never finds out.
+# Mirrors check 7 in hooks/validate-ai-first.sh - keep the two in step.
+# Tags come from parse_tags() (#230) so taxonomy and syntax read one parser.
+_TAG_ALLOWED_RE = re.compile(r"^[\w/-]+$")
+_TAG_HAS_NON_DIGIT_RE = re.compile(r"[^\d/]")
+def tag_problem(tag: str):
+    """Why Obsidian would render `tag` broken, or None if it is valid."""
+    t = tag.lstrip("#")
+    if not t:
+        return "empty tag"
+    if " " in t or "\t" in t:
+        return "contains whitespace - use `-` between words"
+    if "." in t:
+        return "contains `.` - use `-` or spell it out"
+    if not _TAG_ALLOWED_RE.match(t):
+        return "contains characters outside letters/digits/_/-//"
+    if not _TAG_HAS_NON_DIGIT_RE.search(t):
+        return f"is digits only - prefix a word, e.g. `store-{t}`"
+    return None
+
+
+def check_tag_syntax(notes: dict) -> list:
+    issues = []
+    for rel, note in notes.items():
+        if not note["has_frontmatter"]:
+            continue
+        for tag in parse_tags(note["frontmatter"]):
+            why = tag_problem(tag)
+            if why:
+                issues.append({
+                    "type": "invalid_tag",
+                    "severity": "warning",
+                    "message": f"Tag `{tag}` {why} (Obsidian renders it broken, silently): {rel}",
+                    "files": [rel],
+                    "tag": tag,
+                })
+    return issues
+
+
 def check_code_fence_wrapped(notes: dict) -> list:
     """Notes whose frontmatter + body were accidentally saved inside a leading ```markdown
     code fence. Flagged separately (and as an error) because the fix is to UNWRAP the fence,
@@ -943,6 +985,7 @@ def run_health_check(vault: Path) -> dict:
         ("Stale tasks", check_stale_tasks(notes)),
         ("Code-fence-wrapped notes", check_code_fence_wrapped(notes)),
         ("Missing frontmatter", check_missing_frontmatter(notes)),
+        ("Invalid tags", check_tag_syntax(notes)),
         ("Empty folders", check_empty_folders(vault, excludes)),
         ("Wanted notes", [i for i in link_gaps if i["type"] == "wanted_note"]),
         ("Missing attachments",

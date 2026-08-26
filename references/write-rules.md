@@ -203,6 +203,27 @@ This lets a command be idempotent and re-runnable without the user fearing it wi
 
 ---
 
+## Batch writes
+
+A run of many `/obsidian-ingest` or `/obsidian-save` calls in one sitting has no unit-of-work boundary of its own: every note lands live as it is written, and abandoning the batch halfway means finding each note by hand (#222, raised by @konsone). The boundary has to come from the vault's own history, because it is the only layer that sees every write from every tool - the Python scripts, the MCP server, and the agent's own Write and Edit tools alike. A staging mode inside the commands would cover only the first two and leave the rest of the batch live, which is worse than no staging at all.
+
+**Git-backed vault.** Branch, run, review, then merge or discard:
+
+```bash
+cd "$OBSIDIAN_VAULT_PATH"
+git checkout -b ingest-2026-08-27        # the batch lives here
+# ... run the ingests ...
+git status && git diff --stat            # review what changed
+git checkout main && git merge ingest-2026-08-27   # accept
+# or: git checkout main && git branch -D ingest-2026-08-27   # abandon, nothing reaches main
+```
+
+Notes written on the branch are searchable while you are on it, which is what you want mid-batch (later ingests build on earlier ones). Switch back to `main` to see the vault without the batch.
+
+**LiveSync (CouchDB) vault.** Take a snapshot before the batch: Self-hosted LiveSync stores document history in CouchDB, so a `Settings > Sync settings > Hatch > Make a backup` (or a CouchDB replication to a scratch database) before the run is the rollback point. Restore the snapshot to abandon the batch. Pausing sync on the other devices during the batch keeps a half-finished set from propagating.
+
+**Either way**, the ingest log line the command writes (step 7 of `/obsidian-ingest`) is the audit trail for what one batch touched; keep the batch small enough that the log fits in one screen.
+
 ## Search Before Write
 
 Before creating any note:

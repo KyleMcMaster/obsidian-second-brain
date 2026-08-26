@@ -1374,3 +1374,45 @@ def test_relative_reference_citations_are_not_silent():
         "outside the install root skips the rule silently:\n  "
         + "\n  ".join(offenders[:15])
     )
+
+
+def test_validate_hook_flags_tags_obsidian_renders_broken(tmp_path):
+    """Check 7 (#221): digits-only, dotted and spaced tags render struck through in
+    Obsidian with no error anywhere, so the hook must be the thing that says so.
+    Valid tags - Unicode letters, nested paths, digits mixed with letters - stay
+    silent. Inline, scalar and block forms are all read."""
+    hook = REPO_ROOT / "hooks/validate-ai-first.sh"
+    head = "---\ntype: note\ndate: 2026-08-27\n"
+    tail = "ai-first: true\n---\n\n## For future agent\n\nbody\n"
+
+    def run(f):
+        return subprocess.run(
+            ["bash", str(hook)],
+            input=json.dumps({"tool_input": {"file_path": str(f)}}),
+            env=dict(os.environ, OBSIDIAN_VAULT_PATH=str(tmp_path)),
+            capture_output=True, text=True,
+        )
+
+    bad_inline = tmp_path / "bad_inline.md"
+    bad_inline.write_text(head + "tags: [project, 33, 2.0, q3 2026]\n" + tail, encoding="utf-8")
+    r = run(bad_inline)
+    assert r.returncode == 0, r.stderr
+    msg = json.loads(r.stdout)["systemMessage"]
+    assert "render broken" in msg
+    assert "tag `33` is digits only" in msg and "store-33" in msg
+    assert "tag `2.0` contains `.`" in msg
+    assert "tag `q3 2026` contains whitespace" in msg
+    assert "`project`" not in msg
+
+    bad_block = tmp_path / "bad_block.md"
+    bad_block.write_text(head + "tags:\n  - person\n  - 033\n" + tail, encoding="utf-8")
+    r = run(bad_block)
+    msg = json.loads(r.stdout)["systemMessage"]
+    assert "tag `033` is digits only" in msg
+
+    good = tmp_path / "good.md"
+    good.write_text(head + "tags: [project, store-33, v2-0, area/sub-topic, ideas_2026, знания, 学习]\n" + tail,
+                    encoding="utf-8")
+    r = run(good)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "", r.stdout
