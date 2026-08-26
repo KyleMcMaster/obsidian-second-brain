@@ -63,6 +63,12 @@ VAULT = pathlib.Path(os.environ.get("VAULT_PATH", "")).expanduser()
 SKILL_REPO = pathlib.Path(os.environ.get(
     "OBSIDIAN_SKILL_REPO", "~/obsidian-second-brain")).expanduser()
 UV_BIN = os.environ.get("UV_BIN", "uv")  # set to an absolute path if uv is not on the launchd/cron PATH
+# Sender allowlist. A bot's username is discoverable, so without this gate anyone who
+# finds the bot can write into the vault and spend the API keys - and a vault entry is
+# memory a later agent treats as trusted. Fails closed: unset means every sender is
+# refused (and told their chat id, so the owner can add it). Comma-separated chat ids.
+ALLOWED_CHAT_IDS = frozenset(
+    s.strip() for s in os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "").split(",") if s.strip())
 URL_RE = re.compile(r"https?://[^\s>]+")
 API = f"https://api.telegram.org/bot{TOKEN}"
 FILE_API = f"https://api.telegram.org/file/bot{TOKEN}"
@@ -542,6 +548,32 @@ def stub_info(name, context):
     return json.loads(m.group(0))
 
 
+def sender_allowed(chat_id):
+    """True only for a chat id listed in TELEGRAM_ALLOWED_CHAT_IDS. Unset list = nobody."""
+    return chat_id is not None and str(chat_id) in ALLOWED_CHAT_IDS
+
+
+def safe_note_path(folder, name):
+    """`folder/<name>.md`, or None if the name would land anywhere else.
+
+    `name` comes out of a `[[wikilink]]` the model wrote, so it is untrusted input:
+    `[[../../.ssh/authorized_keys]]` must not become a write outside the vault.
+    Rejects path separators, dot-names, and anything whose resolved parent is not
+    exactly `folder`."""
+    name = (name or "").strip()
+    if not name or name in (".", "..") or name.startswith(".") or "\0" in name:
+        return None
+    if "/" in name or "\\" in name:
+        return None
+    candidate = folder / f"{name}.md"
+    try:
+        if candidate.resolve().parent != folder.resolve():
+            return None
+    except (OSError, RuntimeError):
+        return None
+    return candidate
+
+
 def create_stub(name, context, when):
     try:
         info = stub_info(name, context)
@@ -556,7 +588,10 @@ def create_stub(name, context, when):
     folder = _folder(TYPE_KIND.get(ntype, "stub"))
     d = VAULT / folder
     d.mkdir(parents=True, exist_ok=True)
-    note = d / f"{name}.md"
+    note = safe_note_path(d, name)
+    if note is None:
+        print(f"refused stub for {name!r}: not a plain note name", file=sys.stderr)
+        return
     if note.exists():
         return
     today = when.strftime("%Y-%m-%d")
@@ -625,6 +660,16 @@ def main():
         last = u["update_id"] + 1
         msg = u.get("message") or {}
         chat_id = (msg.get("chat") or {}).get("id")
+        if not sender_allowed(chat_id):
+            print(f"refused update {u['update_id']} from chat {chat_id}: "
+                  "not in TELEGRAM_ALLOWED_CHAT_IDS", file=sys.stderr)
+            if not ALLOWED_CHAT_IDS:
+                # Nothing configured yet: this is the owner's first message. Tell them
+                # the id to add. Once a list exists, strangers get silence.
+                reply(chat_id, f"This bot is private and not set up yet. Your chat id is "
+                               f"{chat_id} - add it to TELEGRAM_ALLOWED_CHAT_IDS in the bot's "
+                               f"config and it will start saving your captures.")
+            continue
         when = datetime.datetime.now()
         try:
             if "photo" in msg:

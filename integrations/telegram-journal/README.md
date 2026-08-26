@@ -70,6 +70,10 @@ cp telegram_journal.env.example ~/.config/obsidian-second-brain/telegram_journal
 chmod 600 ~/.config/obsidian-second-brain/telegram_journal.env
 ```
 
+**`TELEGRAM_ALLOWED_CHAT_IDS` is required.** The bot refuses every sender not on this list.
+Leave it blank for the first test run below: the bot replies with your chat id, you paste
+it in, and from then on only you can write to the vault. (Or get the id from @userinfobot.)
+
 The script contains no secrets - it reads them from this file. **Never commit the
 filled-in `telegram_journal.env`** (the included `.gitignore` blocks it).
 
@@ -153,6 +157,14 @@ Claude Haiku tidy/image call costs anything.
 
 - Secrets live only in `~/.config/obsidian-second-brain/telegram_journal.env` (chmod 600),
   never in the script or this repo.
+- **Sender allowlist, fail closed.** Only chat ids in `TELEGRAM_ALLOWED_CHAT_IDS` are
+  processed. A bot's username is discoverable, and a vault entry is memory a later agent
+  treats as trusted, so an unlisted sender gets refused (logged to stderr) rather than a
+  note. With the list empty the bot processes nothing and only tells the sender their id.
+- **Vault-bounded writes.** Note names the model produces (from `[[wikilinks]]` in a
+  capture) are checked to resolve inside the target folder before anything is written;
+  a name with a path separator, `..`, or a leading dot is refused. Media and PDF filenames
+  are date-prefixed and stripped to a safe character set.
 - Keep your bot private (do not share its username/token); it is a personal capture inbox.
 - Treat the bot token like a password - if it leaks, revoke it in @BotFather and reissue.
 
