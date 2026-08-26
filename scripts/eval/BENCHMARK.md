@@ -68,8 +68,16 @@ generator created the canonical note itself. There are no judgement calls.
 
 ## Baseline
 
-obsidian-second-brain v0.14.0, corpus `a932e94f850830e9`, 300 notes,
+obsidian-second-brain v0.14.0, corpus `5773dc7f39b0c3b0`, 300 notes,
 `bge-m3` embeddings via Ollama.
+
+Corpus hash history: the table was measured on `a932e94f850830e9`. The
+future-agent preamble rename (f9b8940) moved the hash to `811cc66735a81d13`
+with no content change that search can see, and the behavior eval (#223)
+moved it to `5773dc7f39b0c3b0` by adding one contradiction line to each
+synthetic daily note and a fourth `behavior` case set to the manifest. The
+lexical rows below were re-run on `5773dc7f39b0c3b0` and are identical to
+three decimals; the hybrid rows were not re-run.
 
 | set | engine | recall@1 | recall@10 | MRR |
 |---|---|---|---|---|

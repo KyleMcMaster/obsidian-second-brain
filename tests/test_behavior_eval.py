@@ -296,7 +296,7 @@ def cases_file(tmp_path):
 
 
 def test_evaluate_reports_a_positive_delta(vault_env_only, cases_file, monkeypatch, capsys):
-    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None: "correct, matches the fact")
+    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None, context=None: "correct, matches the fact")
     monkeypatch.setattr(bev, "_answer_without_vault", lambda q, model=None: "I don't know")
 
     def fake_judge(q, key, a, b, model=None):
@@ -317,7 +317,7 @@ def test_evaluate_reports_a_positive_delta(vault_env_only, cases_file, monkeypat
 
 
 def test_evaluate_reports_regressions_without_truncation(vault_env_only, cases_file, monkeypatch, capsys):
-    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None: "vault-on")
+    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None, context=None: "vault-on")
     monkeypatch.setattr(bev, "_answer_without_vault", lambda q, model=None: "vault-off")
 
     def fake_judge(q, key, a, b, model=None):
@@ -336,7 +336,7 @@ def test_evaluate_reports_regressions_without_truncation(vault_env_only, cases_f
 
 
 def test_evaluate_does_not_crash_on_zero_delta(vault_env_only, cases_file, monkeypatch, capsys):
-    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None: "same")
+    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None, context=None: "same")
     monkeypatch.setattr(bev, "_answer_without_vault", lambda q, model=None: "same")
     monkeypatch.setattr(bev, "_judge",
                          lambda q, key, a, b, model=None: {"score_a": 3, "score_b": 3, "reasoning": "tie"})
@@ -347,7 +347,7 @@ def test_evaluate_does_not_crash_on_zero_delta(vault_env_only, cases_file, monke
 
 
 def test_evaluate_excludes_unjudged_cases_from_delta_but_reports_them(vault_env_only, cases_file, monkeypatch, capsys):
-    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None: "vault-on")
+    monkeypatch.setattr(bev, "_answer_with_vault", lambda q, model=None, context=None: "vault-on")
     monkeypatch.setattr(bev, "_answer_without_vault", lambda q, model=None: "vault-off")
     monkeypatch.setattr(bev, "_judge", lambda q, key, a, b, model=None: None)  # every judge call fails
     rc = bev.evaluate(cases_file, as_json=True, answer_model="grok-4.5", judge_model="gpt-4o-mini")
@@ -385,3 +385,69 @@ def test_generate_refuses_to_overwrite_without_force(tmp_path):
     assert result.returncode == 1
     assert "Refusing to overwrite" in result.stderr
     assert p.read_text(encoding="utf-8") == '{"q": "old"}\n'
+
+
+# --------------------------------------------------------------------------- #
+# A retrieval miss is a judged regression, not an unjudged case
+# --------------------------------------------------------------------------- #
+def test_empty_retrieval_is_judged_and_lands_in_regressions(vault_env_only, cases_file, monkeypatch, capsys):
+    """Search returning nothing is the vault failing hardest. It must be scored
+    against the vault-off answer and show up in the regression bucket - not
+    vanish as "answer generation failed"."""
+    monkeypatch.setattr(bev, "_context_for", lambda q: "")
+    seen_context = []
+
+    def fake_with_vault(q, model=None, context=None):
+        seen_context.append(context)
+        return "I do not know."
+
+    monkeypatch.setattr(bev, "_answer_with_vault", fake_with_vault)
+    monkeypatch.setattr(bev, "_answer_without_vault", lambda q, model=None: "Canonical fact about the topic.")
+
+    def fake_judge(q, key, a, b, model=None):
+        return {"score_a": 1 if a == "I do not know." else 5,
+                "score_b": 1 if b == "I do not know." else 5,
+                "reasoning": "one answer admits ignorance"}
+
+    monkeypatch.setattr(bev, "_judge", fake_judge)
+    rc = bev.evaluate(cases_file, as_json=True, answer_model="grok-4.5", judge_model="gpt-4o-mini")
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert seen_context == ["", ""], "evaluate() must hand the (empty) context to the vault arm"
+    assert out["summary"]["unjudged"] == 0
+    assert out["summary"]["judged"] == 2
+    assert out["summary"]["regressions"] == 2
+    assert out["summary"]["retrieval_misses"] == 2
+    assert all(x["retrieval_empty"] for x in out["regressions"])
+
+
+def test_vault_arm_answers_with_no_notes_instead_of_returning_none(monkeypatch):
+    prompts = []
+
+    class FakeGrok:
+        @staticmethod
+        def call(prompt, *, command, model=None, max_output_tokens=300):
+            prompts.append(prompt)
+            return {"text": "I do not know."}
+
+    monkeypatch.setitem(sys.modules, "research.lib.grok", FakeGrok)
+    assert bev._answer_with_vault("q", context="") == "I do not know."
+    assert "no notes were retrieved" in prompts[0]
+
+
+def test_both_arms_forbid_provenance_language(monkeypatch):
+    """The judge is only blind if neither answer says where it came from."""
+    prompts = []
+
+    class FakeGrok:
+        @staticmethod
+        def call(prompt, *, command, model=None, max_output_tokens=300):
+            prompts.append(prompt)
+            return {"text": "x"}
+
+    monkeypatch.setitem(sys.modules, "research.lib.grok", FakeGrok)
+    bev._answer_with_vault("q", context="--- a.md ---\nfact")
+    bev._answer_without_vault("q")
+    assert len(prompts) == 2
+    for p in prompts:
+        assert "Do not mention notes, sources, context" in p

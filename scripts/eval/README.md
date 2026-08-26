@@ -100,6 +100,15 @@ of cases where the vault-on answer scored strictly lower than vault-off -
 where having the vault made the answer worse, e.g. by retrieving a
 noisy or superseded note instead of the reconciling one.
 
+Two details that keep the comparison honest. Both arms are told not to
+mention notes, sources or context in the answer - otherwise the vault-on
+answer says "according to the notes" and the judge can tell the conditions
+apart from the text, which defeats the A/B labels. And a question where
+search returns nothing is still answered (with no notes) and scored: it is
+recorded with `retrieval_empty: true`, counted in `retrieval_misses`, and
+lands in the regression bucket like any other loss, because an empty
+retrieval is the vault's worst failure, not a harness error.
+
 LLM-judged evals on a small synthetic corpus are inherently noisy signal, not
 a scientific measurement - treat any single run's delta as suggestive. No
 numbers from this harness are promoted into `BASELINE.md` or `BENCHMARK.md`;

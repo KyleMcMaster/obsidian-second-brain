@@ -89,7 +89,11 @@ def _require_distinct_provider_and_model(
     """The model that judges an answer pair must not be the model that wrote
     it - grading a model's own answer risks self-preference bias inflating
     the vault-on score. Hard failure, not a warning: never silently proceed
-    with a judge that could be scoring itself."""
+    with a judge that could be scoring itself.
+
+    Today ANSWER_PROVIDER and JUDGE_PROVIDER are distinct constants, so this
+    cannot fire from the CLI - it is a fence for the day someone makes the
+    providers configurable, not an active check on current inputs."""
     if (answer_provider, answer_model) == (judge_provider, judge_model):
         raise SystemExit(
             f"Answer model and judge model are identical ({answer_provider}:{answer_model}) - "
@@ -139,13 +143,26 @@ def generate(n: int, cases_path: Path) -> int:
 # --------------------------------------------------------------------------- #
 # Answer generation - grok.call() only, never the judge client
 # --------------------------------------------------------------------------- #
+# Both arms get this line. Without it the vault-on answer says "the notes state"
+# or "according to the provided context" and the vault-off answer never does, so
+# the judge can tell the conditions apart from the text alone - the blindness
+# the A/B labels are supposed to provide is gone. Provenance language is
+# stripped at the source instead.
+_NO_PROVENANCE_RULE = (
+    "Write the answer as direct statements of fact. Do not mention notes, "
+    "sources, context, documents, or where the information came from, and do "
+    "not say whether you were given any material."
+)
+
+
 def _answer_without_vault(question: str, model: str | None = None) -> str | None:
     from research.lib import grok
 
     prompt = (
         "Answer the following question as best you can from what you already "
-        "know. If you do not know, say so plainly rather than guessing.\n\n"
-        f"Question: {question}"
+        "know. If you do not know, say so plainly rather than guessing. "
+        + _NO_PROVENANCE_RULE
+        + f"\n\nQuestion: {question}"
     )
     try:
         res = grok.call(prompt, command="behavior-eval-no-vault", model=model,
@@ -178,16 +195,26 @@ def _context_for(question: str) -> str:
     return "\n\n".join(chunks)
 
 
-def _answer_with_vault(question: str, model: str | None = None) -> str | None:
+def _answer_with_vault(question: str, model: str | None = None,
+                       context: str | None = None) -> str | None:
+    """Vault-on arm. `context` is the retrieved notes (evaluate() passes it so
+    the retrieval outcome is recorded on the case); None means fetch here.
+
+    An empty context is NOT a generation failure and must not turn into an
+    unjudged case: it is the vault failing hardest - search found nothing for
+    a question the corpus can answer - and that is exactly what the
+    regression bucket exists to show. So the arm still answers, with no notes,
+    and the judge scores that answer like any other."""
     from research.lib import grok
 
-    context = _context_for(question)
-    if not context:
-        return None
+    if context is None:
+        context = _context_for(question)
+    notes = context if context else "(no notes were retrieved for this question)"
     prompt = (
         "Answer the following question using ONLY the notes below. If the "
-        "notes don't contain the answer, say so plainly rather than guessing.\n\n"
-        f"Notes:\n{context}\n\nQuestion: {question}"
+        "notes don't contain the answer, say so plainly rather than guessing. "
+        + _NO_PROVENANCE_RULE
+        + f"\n\nNotes:\n{notes}\n\nQuestion: {question}"
     )
     try:
         res = grok.call(prompt, command="behavior-eval-with-vault", model=model,
@@ -283,12 +310,15 @@ def evaluate(cases_path: Path, as_json: bool,
     for i, c in enumerate(rows):
         question = c["q"]
         answer_key = c.get("answer_key", "")
-        vault_on = _answer_with_vault(question, model=answer_model)
+        context = _context_for(question)
+        retrieval_empty = not context
+        vault_on = _answer_with_vault(question, model=answer_model, context=context)
         vault_off = _answer_without_vault(question, model=answer_model)
         if vault_on is None or vault_off is None:
             per_case.append({
                 "q": question, "category": c.get("category", ""), "title": c.get("title", ""),
                 "judged": False, "reason": "answer generation failed",
+                "retrieval_empty": retrieval_empty,
             })
             continue
 
@@ -311,6 +341,7 @@ def evaluate(cases_path: Path, as_json: bool,
             "category": c.get("category", ""),
             "title": c.get("title", ""),
             "judged": True,
+            "retrieval_empty": retrieval_empty,
             "vault_on_score": vault_on_score,
             "vault_off_score": vault_off_score,
             "delta": vault_on_score - vault_off_score,
@@ -331,6 +362,7 @@ def evaluate(cases_path: Path, as_json: bool,
     }
     overall_delta = round(sum(x["delta"] for x in judged) / n, 3) if n else None
     regressions = [x for x in judged if x["delta"] < 0]
+    retrieval_misses = [x for x in per_case if x.get("retrieval_empty")]
 
     summary = {
         "cases": len(per_case),
@@ -341,6 +373,7 @@ def evaluate(cases_path: Path, as_json: bool,
         "overall_delta": overall_delta,
         "by_category": category_delta,
         "regressions": len(regressions),
+        "retrieval_misses": len(retrieval_misses),
     }
 
     if as_json:
@@ -367,7 +400,8 @@ def evaluate(cases_path: Path, as_json: bool,
         print(f"\nRegressions - vault-on scored WORSE than vault-off ({len(regressions)}, "
               f"never truncated):")
         for x in regressions:
-            print(f"  [{x['category']}] delta {x['delta']:+.1f}  Q: {x['q'][:70]}")
+            miss = "  (search returned nothing)" if x.get("retrieval_empty") else ""
+            print(f"  [{x['category']}] delta {x['delta']:+.1f}  Q: {x['q'][:70]}{miss}")
             print(f"    vault-on ({x['vault_on_score']}): {x['vault_on_answer'][:120]}")
             print(f"    vault-off ({x['vault_off_score']}): {x['vault_off_answer'][:120]}")
     if unjudged:
