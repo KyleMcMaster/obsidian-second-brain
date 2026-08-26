@@ -29,11 +29,14 @@ or wire it into a client's MCP config (see README.md).
 # (no `if TYPE_CHECKING:` guarded names in those positions).
 #
 # Note that the `mcp<2` pin in .claude-plugin/plugin.json does not prevent
-# this: `mcp<2` resolves to 1.9.4, which is precisely the fastmcp that trips
-# on string annotations. The pin guards against the 2.x rewrite dropping
-# `mcp.server.fastmcp` entirely; it does not guard against this. If the pin is
-# ever lifted to 2.x, recheck whether the issubclass path was fixed there, in
-# which case this import can come back.
+# this. On a current index `mcp<2` resolves to the latest 1.x (1.29.1 as of
+# 2026-08, where fastmcp handles string annotations and all 12 tools register
+# with the import present), but a resolver that lands on an older 1.x such as
+# 1.9.4 hits the issubclass path above. The pin guards against the 2.x rewrite
+# dropping `mcp.server.fastmcp` entirely; it does not pin a 1.x that is safe
+# here. Leaving the import out keeps the server working on every 1.x. If the
+# pin is ever lifted to 2.x, recheck the issubclass path before bringing the
+# import back.
 
 import json
 import sys
