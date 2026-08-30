@@ -19,6 +19,7 @@ provider.
 from __future__ import annotations
 
 import os
+import shutil
 
 import pytest
 
@@ -239,6 +240,10 @@ def test_join_chunk_texts_empty_list_is_empty_string():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="ffmpeg/ffprobe not on PATH (not installed by this repo's CI image)",
+)
 def test_split_reencoded_chunks_math(tmp_path, monkeypatch):
     """Synthetic tiny-cap scenario: chunk boundaries, 10s overlap, 0.98 margin.
 
