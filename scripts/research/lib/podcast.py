@@ -8,8 +8,9 @@ Inputs accepted:
 
 Transcript priority:
   1. RSS <podcast:transcript> tag (free, fast)
-  2. Whisper API via OPENAI_API_KEY (paid, ~$0.006/min)
-  3. None - caller falls back to show-notes-only summary
+  2. Groq-hosted Whisper via GROQ_API_KEY (free tier; see lib/groq.py)
+  3. Whisper API via OPENAI_API_KEY (paid, ~$0.006/min)
+  4. None - caller falls back to show-notes-only summary
 """
 
 from __future__ import annotations
@@ -128,8 +129,15 @@ def safe_fetch_url(url: str) -> str | None:
     return None
 
 
-def resolve_apple_to_rss(apple_url: str) -> tuple[str, str | None]:
-    """Resolve Apple Podcasts URL to (feed_url, episode_id_str_or_None) via free iTunes Lookup API."""
+def resolve_apple_to_rss(apple_url: str) -> tuple[str, str | None, str | None]:
+    """Resolve Apple Podcasts URL to (feed_url, episode_id | None, episode_title | None).
+
+    Apple's ?i=<trackId> is an Apple-internal id that never appears in the RSS
+    feed's guids, so matching by id alone silently falls back to the most
+    recent episode. A second iTunes lookup with entity=podcastEpisode resolves
+    the trackId to its trackName, which _pick_entry can match against feed
+    entry titles.
+    """
     m = APPLE_RE.search(apple_url)
     if not m:
         raise ValueError(f"Not a recognizable Apple Podcasts URL: {apple_url}")
@@ -142,7 +150,23 @@ def resolve_apple_to_rss(apple_url: str) -> tuple[str, str | None]:
     feed_url = results[0].get("feedUrl")
     if not feed_url:
         raise ValueError(f"iTunes lookup did not return a feedUrl for show id {show_id}")
-    return feed_url, episode_id
+    episode_title: str | None = None
+    if episode_id:
+        try:
+            ep_resp = requests.get(
+                ITUNES_LOOKUP,
+                params={"id": show_id, "entity": "podcastEpisode", "limit": 200},
+                timeout=15,
+            )
+            ep_resp.raise_for_status()
+            for item in ep_resp.json().get("results", []):
+                if str(item.get("trackId", "")) == episode_id:
+                    episode_title = (item.get("trackName") or "").strip() or None
+                    break
+        except (OSError, ValueError):
+            pass  # title matching is best-effort; id fallback still applies.
+            # OSError covers requests.RequestException and raw socket errors.
+    return feed_url, episode_id, episode_title
 
 
 def parse_feed(
@@ -438,8 +462,8 @@ def resolve_input(user_input: str) -> dict[str, Any]:
         raise ValueError("Input must be a URL (Apple Podcasts URL or RSS feed URL)")
 
     if is_apple_url(s):
-        feed_url, episode_id = resolve_apple_to_rss(s)
-        episode = parse_feed(feed_url, episode_id=episode_id)
+        feed_url, episode_id, episode_title = resolve_apple_to_rss(s)
+        episode = parse_feed(feed_url, episode_id=episode_id, episode_title=episode_title)
         episode["source_url"] = s
         episode["feed_url"] = feed_url
         return episode

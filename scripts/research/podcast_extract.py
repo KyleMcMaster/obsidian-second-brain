@@ -5,8 +5,9 @@ Inputs: Apple Podcasts URL OR RSS feed URL (with optional ?episode=<guid> select
 
 Transcript priority:
   1. <podcast:transcript> tag in the RSS feed (free)
-  2. Whisper API if OPENAI_API_KEY is set (paid, ~$0.006/min)
-  3. Show-notes-only fallback (no audio fetch)
+  2. Groq-hosted Whisper if GROQ_API_KEY is set (free tier, ASH-limited)
+  3. Whisper API if OPENAI_API_KEY is set (paid, ~$0.006/min)
+  4. Show-notes-only fallback (no audio fetch)
 
 Then summarizes via Grok and saves an AI-first note to Research/Podcasts/.
 Spotify episode URLs are supported via the public-RSS bridge (lib/podcast.py):
@@ -17,7 +18,7 @@ import os
 import sys
 from datetime import datetime
 
-from .lib import config, grok, podcast, vault
+from .lib import config, grok, groq, podcast, vault
 
 SUMMARIZE_PROMPT = """You are summarizing a podcast episode for a knowledge vault. The note will be read by future agent (an AI), not by a human. Optimize for AI retrieval.
 
@@ -70,8 +71,9 @@ def _resolve_transcript(episode: dict) -> tuple[str | None, str]:
     """Return (transcript_text_or_None, source_label).
 
     Falls through silently to the next path only when the prior path is unavailable;
-    every rejection (transcript tag too short, Whisper too short, JSON unparseable)
-    is logged so the user knows why a costlier path is being attempted.
+    every rejection (transcript tag too short, Groq empty/ASH-exhausted, Whisper too
+    short, JSON unparseable) is logged so the user knows why a costlier path is being
+    attempted.
     """
     if episode.get("transcript_url"):
         print(f"[/podcast] Fetching transcript tag: {episode['transcript_url']}", file=sys.stderr)
@@ -92,6 +94,16 @@ def _resolve_transcript(episode: dict) -> tuple[str | None, str]:
             return text, "rss-transcript-tag"
 
     if episode.get("audio_url"):
+        if groq.is_groq_configured():
+            print("[/podcast] Trying Groq Whisper (free tier)...", file=sys.stderr)
+            text = groq.transcribe_via_groq(episode["audio_url"], podcast.safe_fetch_url)
+            if text and len(text) > MIN_TRANSCRIPT_CHARS:
+                return text, "groq-whisper-api"
+            print(
+                "[/podcast] Groq returned no usable transcript - falling through. "
+                "(429 = free-tier ASH limit for this hour; not retried per episode.)",
+                file=sys.stderr,
+            )
         if not os.environ.get("OPENAI_API_KEY", "").strip():
             print(
                 "[/podcast] Skipping Whisper: OPENAI_API_KEY not set. "
@@ -175,12 +187,25 @@ def main(argv: list[str]) -> int:
         content=content,
     )
 
-    print(f"[/podcast] Summarizing via Grok (source: {transcript_source})...\n", file=sys.stderr)
-    try:
-        result = grok.call(prompt, command="podcast", max_output_tokens=3000)
-    except Exception as e:
-        print(f"\n❌ /podcast summarize failed: {e}", file=sys.stderr)
-        return 1
+    # Prefer Gemini for the summary when its key is set (generous free tier),
+    # fall back to Grok - transparently, since gemini.call mirrors grok.call's
+    # return shape. No Gemini key = exactly the old Grok-only behavior.
+    # Same pattern as /youtube (youtube_extract.py).
+    result = None
+    if os.environ.get("GEMINI_API_KEY", "").strip():
+        print("[/podcast] Summarizing via Gemini (free tier)...\n", file=sys.stderr)
+        try:
+            from .lib import gemini
+            result = gemini.call(prompt, command="podcast", max_output_tokens=3000)
+        except Exception as e:  # noqa: BLE001 - fall back to Grok on any Gemini failure
+            print(f"[/podcast] Gemini failed ({e}); falling back to Grok...", file=sys.stderr)
+    if result is None:
+        print(f"[/podcast] Summarizing via Grok (source: {transcript_source})...\n", file=sys.stderr)
+        try:
+            result = grok.call(prompt, command="podcast", max_output_tokens=3000)
+        except Exception as e:
+            print(f"\n❌ /podcast summarize failed: {e}", file=sys.stderr)
+            return 1
 
     print(f"# {title}")
     print(f"**Show:** {show} · **Host:** {host} · **Published:** {published}")
@@ -194,8 +219,9 @@ def main(argv: list[str]) -> int:
         f"\"{title}\" from {show} ({host}, published {published}), processed on "
         f"{now.strftime('%Y-%m-%d %H:%M')}. Summarized via Grok. "
         f"Source label '{transcript_source}' indicates transcript provenance: "
-        f"'rss-transcript-tag' (publisher-provided, high fidelity), 'whisper-api' "
-        f"(Whisper transcription, may have errors on names), or 'show-notes' "
+        f"'rss-transcript-tag' (publisher-provided, high fidelity), 'groq-whisper-api' "
+        f"(free-tier Groq-hosted Whisper, may have errors on names), 'whisper-api' "
+        f"(OpenAI Whisper transcription, may have errors on names), or 'show-notes' "
         f"(notes only, no transcript - quotes will be absent). Use Worth Following Up On bullets to spawn deeper research."
     )
     fm = {
