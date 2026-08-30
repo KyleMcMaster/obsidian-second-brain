@@ -153,7 +153,7 @@ def test_norm_sentence_strips_punctuation_and_case():
 
 
 def test_norm_sentence_alphanumerics_only():
-    assert groq._norm_sentence("It's a co-op — really.") == "itsacoopreally"
+    assert groq._norm_sentence("It's a co-op - really.") == "itsacoopreally"
 
 
 def test_sentences_keeps_terminators_attached():
