@@ -133,6 +133,14 @@ def merge_frontmatter(canonical_fm: dict, retired_fm: dict, retired_title: str, 
     for k, v in retired_fm.items():
         if k not in canonical_fm:
             merged[k] = v
+        elif isinstance(canonical_fm[k], list) and isinstance(v, list):
+            # Two lists (tags, aliases, related-*) are a union, not a conflict:
+            # "canonical wins" would silently drop every tag only the retired
+            # note carried. Order: canonical's items first, then new ones.
+            seen = {str(x).lower() for x in canonical_fm[k]}
+            merged[k] = list(canonical_fm[k]) + [
+                x for x in v if str(x).lower() not in seen and not seen.add(str(x).lower())
+            ]
         elif canonical_fm[k] != v:
             conflicts[k] = v
     if conflicts:
@@ -181,17 +189,28 @@ def compute_merge(vault: Path, canonical_rel: str, retire_rel: str, merged_body:
     if not canonical_text.endswith("\n"):
         canonical_text += "\n"
 
+    # Link target for the redirect. A bare `[[stem]]` is what every existing
+    # wikilink to the canonical note uses, so it is the right default - except
+    # when both notes share a stem (the most common duplicate: "Ideas/Project
+    # Alpha.md" vs "Archive/Project Alpha.md"). Then `[[Project Alpha]]` is
+    # ambiguous and Obsidian may resolve it to the redirect note itself, so the
+    # link is path-qualified instead.
+    if retired_title.lower() == canonical_title.lower():
+        link_target = canonical_rel[:-3] if canonical_rel.endswith(".md") else canonical_rel
+    else:
+        link_target = canonical_title
+
     today = date.today().isoformat()
     redirect_fm = {
         "date": today,
         "type": "redirect",
         "tags": ["redirect"],
-        "redirects_to": f"[[{canonical_title}]]",
+        "redirects_to": f"[[{link_target}]]",
         "ai-first": True,
     }
     redirect_text = (
         dump_frontmatter(redirect_fm)
-        + f"\nThis note was merged into [[{canonical_title}]] on {today}. "
+        + f"\nThis note was merged into [[{link_target}]] on {today}. "
         "See the canonical note for current content.\n"
     )
 

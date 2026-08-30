@@ -162,7 +162,7 @@ def main(argv: list[str]) -> int:
     if transcript_text:
         # Podcasts are 1-3h conversations; the old 24k cap discarded most of
         # the episode. Same rationale as YOUTUBE_TX_LIMIT in youtube_extract.
-        TX_LIMIT = int(config.get_optional("PODCAST_TX_LIMIT", "480000"))
+        TX_LIMIT = config.get_optional_int("PODCAST_TX_LIMIT", 480000)
         content = transcript_text[:TX_LIMIT]
         if len(transcript_text) > TX_LIMIT:
             content += f"\n\n[Transcript truncated at {TX_LIMIT} chars from total {len(transcript_text)} chars]"
@@ -192,11 +192,13 @@ def main(argv: list[str]) -> int:
     # return shape. No Gemini key = exactly the old Grok-only behavior.
     # Same pattern as /youtube (youtube_extract.py).
     result = None
+    summarizer = "Grok"
     if os.environ.get("GEMINI_API_KEY", "").strip():
         print("[/podcast] Summarizing via Gemini (free tier)...\n", file=sys.stderr)
         try:
             from .lib import gemini
             result = gemini.call(prompt, command="podcast", max_output_tokens=3000)
+            summarizer = "Gemini"
         except Exception as e:  # noqa: BLE001 - fall back to Grok on any Gemini failure
             print(f"[/podcast] Gemini failed ({e}); falling back to Grok...", file=sys.stderr)
     if result is None:
@@ -217,7 +219,7 @@ def main(argv: list[str]) -> int:
     preamble = (
         f"For future agent: This note is a {transcript_source}-grounded summary of podcast episode "
         f"\"{title}\" from {show} ({host}, published {published}), processed on "
-        f"{now.strftime('%Y-%m-%d %H:%M')}. Summarized via Grok. "
+        f"{now.strftime('%Y-%m-%d %H:%M')}. Summarized via {summarizer}. "
         f"Source label '{transcript_source}' indicates transcript provenance: "
         f"'rss-transcript-tag' (publisher-provided, high fidelity), 'groq-whisper-api' "
         f"(free-tier Groq-hosted Whisper, may have errors on names), 'whisper-api' "

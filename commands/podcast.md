@@ -27,10 +27,10 @@ Use the obsidian-second-brain skill. Execute `/podcast [url]`:
    - Parses the RSS feed, extracts episode metadata (title, show, host, published, duration, audio URL, show notes).
    - Tries to obtain a transcript in this order:
      1. **`<podcast:transcript>` tag** in the RSS feed (free, fast, high fidelity).
-     2. **Groq-hosted Whisper**, only if `GROQ_API_KEY` is set (free tier). Downloads audio, re-encodes it to 32kbps mono so episodes up to ~4.5h fit in Groq's 25MB per-request cap (longer episodes are split into chunks with overlap and stitched). No cost on the free tier.
+     2. **Groq-hosted Whisper**, only if `GROQ_API_KEY` is set (free tier). Downloads audio, re-encodes it to 32kbps mono so episodes up to ~4.5h fit in Groq's 25MB per-request cap (longer episodes are split into chunks with overlap and stitched). No cost on the free tier, but the free tier also caps audio at 7,200 seconds per hour (as of 2026-08, console.groq.com): an episode longer than about 2h gets a 429 and falls through to the next step, and a second long episode within the same hour does too. Needs `ffmpeg` and `ffprobe` on PATH.
      3. **Whisper API**, only if `OPENAI_API_KEY` is set. Downloads audio (<=25 MB OpenAI per-file limit), transcribes via `whisper-1`. Approximate cost: $0.006/min.
      4. **Show-notes-only fallback**. If no transcript path works, summarizes from RSS show notes alone. Quality drops; Notable Quotes will be empty.
-   - Sends transcript-or-shownotes to Grok for AI-first summarization.
+   - Sends transcript-or-shownotes for AI-first summarization: Gemini when `GEMINI_API_KEY` is set (free tier, 1M context), otherwise Grok. The transcript is capped at `PODCAST_TX_LIMIT` characters (default 480,000, about 120k tokens) with a truncation note if the episode is longer; on the Grok path that cap is a real cost, roughly $0.36 per 3h episode at grok-4 rates, so lower it there if that matters.
    - Returns: TL;DR, Key Points, Notable Quotes, Themes & Topics, Guests & People Mentioned, Worth Following Up On.
 
 4. Show the script output verbatim to the user.

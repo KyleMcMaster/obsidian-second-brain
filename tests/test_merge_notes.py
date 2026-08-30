@@ -236,7 +236,9 @@ def test_from_health_resolves_a_real_duplicate_pair(tmp_path):
         (vault / "Archive" / "Project Alpha.md").read_text(encoding="utf-8").split("---")[1]
     )
     assert retired_fm["type"] == "redirect"
-    assert retired_fm["redirects_to"] == "[[Project Alpha]]"
+    # Same stem on both sides, so a bare [[Project Alpha]] would be ambiguous
+    # (it could resolve to this very stub); the link is path-qualified.
+    assert retired_fm["redirects_to"] == "[[Ideas/Project Alpha]]"
     # Same stem on both sides: folding the retired title into aliases would be
     # a no-op alias identical to the canonical note's own filename.
     canonical_fm = yaml.safe_load(
@@ -277,3 +279,60 @@ def test_missing_merged_body_file_flag_errors_before_writing(tmp_path):
     assert result.returncode != 0
     assert "--merged-body-file is required" in result.stderr
     assert (vault / "Retired.md").read_text(encoding="utf-8") == RETIRED
+
+
+def test_list_fields_are_unioned_not_treated_as_conflicts(tmp_path):
+    """Review finding on #231: tags/aliases that differ between the two notes
+    must merge as a union. Canonical-wins would silently drop every tag only
+    the retired note carried."""
+    vault = _vault(tmp_path)
+    canonical = CANONICAL.replace("tags: [idea, ai]", "tags: [idea, ai, canon-only]")
+    retired = RETIRED.replace("tags: [idea, ai]", "tags: [idea, retired-only, AI]")
+    _write_pair(vault, canonical=canonical, retired=retired)
+    body_file = tmp_path / "body.md"
+    body_file.write_text(MERGED_BODY, encoding="utf-8")
+    result = _run(
+        "--path", str(vault),
+        "--canonical", "Canonical.md",
+        "--retire", "Retired.md",
+        "--merged-body-file", str(body_file),
+        "--apply",
+    )
+    assert result.returncode == 0, result.stderr
+    fm = yaml.safe_load((vault / "Canonical.md").read_text(encoding="utf-8").split("---")[1])
+    assert fm["tags"] == ["idea", "ai", "canon-only", "retired-only"]  # union, case-insensitive dedup
+    assert "tags" not in fm.get("merged_from", {})  # a union is not a conflict
+
+
+def test_same_stem_redirect_is_path_qualified(tmp_path):
+    """Two notes named X.md in different folders: a bare [[X]] from the redirect
+    stub is ambiguous and can resolve to the stub itself. The link must be
+    path-qualified in that case, and stay a bare stem otherwise."""
+    vault = _vault(tmp_path)
+    (vault / "Ideas").mkdir()
+    (vault / "Archive").mkdir()
+    (vault / "Ideas" / "Project Alpha.md").write_text(CANONICAL, encoding="utf-8")
+    (vault / "Archive" / "Project Alpha.md").write_text(RETIRED, encoding="utf-8")
+    body_file = tmp_path / "body.md"
+    body_file.write_text(MERGED_BODY, encoding="utf-8")
+    result = _run(
+        "--path", str(vault),
+        "--canonical", "Ideas/Project Alpha.md",
+        "--retire", "Archive/Project Alpha.md",
+        "--merged-body-file", str(body_file),
+        "--apply",
+    )
+    assert result.returncode == 0, result.stderr
+    stub = (vault / "Archive" / "Project Alpha.md").read_text(encoding="utf-8")
+    assert 'redirects_to: "[[Ideas/Project Alpha]]"' in stub
+    assert "merged into [[Ideas/Project Alpha]]" in stub
+
+    # Different stems keep the bare link every existing wikilink already uses.
+    _write_pair(vault)
+    result = _run(
+        "--path", str(vault),
+        "--canonical", "Canonical.md",
+        "--retire", "Retired.md",
+        "--merged-body-file", str(body_file),
+    )
+    assert 'redirects_to: "[[Canonical]]"' in result.stdout

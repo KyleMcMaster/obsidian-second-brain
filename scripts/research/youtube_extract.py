@@ -167,7 +167,7 @@ def main(argv: list[str]) -> int:
         # ~120k tokens. Gemini 1M-context flash models take full interview
         # transcripts (3h video ~ 400k chars) with headroom; the old 24k cap
         # silently discarded 90%+ of long videos.
-        TX_LIMIT = int(config.get_optional("YOUTUBE_TX_LIMIT", "480000"))
+        TX_LIMIT = config.get_optional_int("YOUTUBE_TX_LIMIT", 480000)
         tx_truncated = transcript[:TX_LIMIT]
         tx_note = "" if len(transcript) <= TX_LIMIT else f"\n\n[Transcript truncated at {TX_LIMIT} chars from total {len(transcript)} chars]"
     else:
@@ -193,11 +193,13 @@ def main(argv: list[str]) -> int:
     # fall back to Grok - transparently, since gemini.call mirrors grok.call's
     # return shape. No Gemini key = exactly the old Grok-only behavior.
     result = None
+    summarizer = "Grok"
     if os.environ.get("GEMINI_API_KEY", "").strip():
         print("[/youtube] Summarizing via Gemini (free tier)...\n", file=sys.stderr)
         try:
             from .lib import gemini
             result = gemini.call(prompt, command="youtube", max_output_tokens=3000)
+            summarizer = "Gemini"
         except Exception as e:  # noqa: BLE001 - fall back to Grok on any Gemini failure
             print(f"[/youtube] Gemini failed ({e}); falling back to Grok...", file=sys.stderr)
     if result is None:
@@ -218,7 +220,7 @@ def main(argv: list[str]) -> int:
     preamble = (
         f"For future agent: This note is a transcript-grounded summary of YouTube video \"{title}\" "
         f"by {channel} (published {published}), processed on {now.strftime('%Y-%m-%d %H:%M')}. "
-        f"Transcript was extracted via youtube-transcript-api and summarized via Grok. "
+        f"Transcript was extracted via youtube-transcript-api and summarized via {summarizer}. "
         f"Quotes are sourced from the transcript verbatim where attributed. Use Worth Following Up On bullets to spawn deeper research."
     )
     if visual:

@@ -26,6 +26,20 @@ def get_optional(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip() or default
 
 
+def get_optional_int(name: str, default: int) -> int:
+    """Integer knob from the environment. A value that is not a whole number
+    (`480k`, `1e6`, `24,000`) exits with the variable named, instead of an
+    `int()` traceback from somewhere inside the command."""
+    raw = get_optional(name, str(default))
+    try:
+        return int(raw)
+    except ValueError:
+        raise SystemExit(
+            f"\n{name}={raw!r} is not a whole number.\n"
+            f"Set it to a plain integer (e.g. {name}={default}) in {ENV_PATH}, or unset it.\n"
+        ) from None
+
+
 XAI_API_KEY = lambda: get_required("XAI_API_KEY")
 PERPLEXITY_API_KEY = lambda: get_required("PERPLEXITY_API_KEY")
 GEMINI_API_KEY = lambda: get_required("GEMINI_API_KEY")
