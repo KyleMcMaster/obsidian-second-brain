@@ -5,8 +5,9 @@ Inputs: Apple Podcasts URL OR RSS feed URL (with optional ?episode=<guid> select
 
 Transcript priority:
   1. <podcast:transcript> tag in the RSS feed (free)
-  2. Whisper API if OPENAI_API_KEY is set (paid, ~$0.006/min)
-  3. Show-notes-only fallback (no audio fetch)
+  2. Groq-hosted Whisper if GROQ_API_KEY is set (free tier, ASH-limited)
+  3. Whisper API if OPENAI_API_KEY is set (paid, ~$0.006/min)
+  4. Show-notes-only fallback (no audio fetch)
 
 Then summarizes via Grok and saves an AI-first note to Research/Podcasts/.
 Spotify episode URLs are supported via the public-RSS bridge (lib/podcast.py):
@@ -17,7 +18,7 @@ import os
 import sys
 from datetime import datetime
 
-from .lib import grok, podcast, vault
+from .lib import config, grok, groq, podcast, vault
 
 SUMMARIZE_PROMPT = """You are summarizing a podcast episode for a knowledge vault. The note will be read by future agent (an AI), not by a human. Optimize for AI retrieval.
 
@@ -70,8 +71,9 @@ def _resolve_transcript(episode: dict) -> tuple[str | None, str]:
     """Return (transcript_text_or_None, source_label).
 
     Falls through silently to the next path only when the prior path is unavailable;
-    every rejection (transcript tag too short, Whisper too short, JSON unparseable)
-    is logged so the user knows why a costlier path is being attempted.
+    every rejection (transcript tag too short, Groq empty/ASH-exhausted, Whisper too
+    short, JSON unparseable) is logged so the user knows why a costlier path is being
+    attempted.
     """
     if episode.get("transcript_url"):
         print(f"[/podcast] Fetching transcript tag: {episode['transcript_url']}", file=sys.stderr)
@@ -92,6 +94,16 @@ def _resolve_transcript(episode: dict) -> tuple[str | None, str]:
             return text, "rss-transcript-tag"
 
     if episode.get("audio_url"):
+        if groq.is_groq_configured():
+            print("[/podcast] Trying Groq Whisper (free tier)...", file=sys.stderr)
+            text = groq.transcribe_via_groq(episode["audio_url"], podcast.safe_fetch_url)
+            if text and len(text) > MIN_TRANSCRIPT_CHARS:
+                return text, "groq-whisper-api"
+            print(
+                "[/podcast] Groq returned no usable transcript - falling through. "
+                "(429 = free-tier ASH limit for this hour; not retried per episode.)",
+                file=sys.stderr,
+            )
         if not os.environ.get("OPENAI_API_KEY", "").strip():
             print(
                 "[/podcast] Skipping Whisper: OPENAI_API_KEY not set. "
@@ -148,7 +160,9 @@ def main(argv: list[str]) -> int:
     transcript_text, transcript_source = _resolve_transcript(episode)
 
     if transcript_text:
-        TX_LIMIT = 24000  # ~6k tokens
+        # Podcasts are 1-3h conversations; the old 24k cap discarded most of
+        # the episode. Same rationale as YOUTUBE_TX_LIMIT in youtube_extract.
+        TX_LIMIT = int(config.get_optional("PODCAST_TX_LIMIT", "480000"))
         content = transcript_text[:TX_LIMIT]
         if len(transcript_text) > TX_LIMIT:
             content += f"\n\n[Transcript truncated at {TX_LIMIT} chars from total {len(transcript_text)} chars]"
@@ -192,8 +206,9 @@ def main(argv: list[str]) -> int:
         f"\"{title}\" from {show} ({host}, published {published}), processed on "
         f"{now.strftime('%Y-%m-%d %H:%M')}. Summarized via Grok. "
         f"Source label '{transcript_source}' indicates transcript provenance: "
-        f"'rss-transcript-tag' (publisher-provided, high fidelity), 'whisper-api' "
-        f"(Whisper transcription, may have errors on names), or 'show-notes' "
+        f"'rss-transcript-tag' (publisher-provided, high fidelity), 'groq-whisper-api' "
+        f"(free-tier Groq-hosted Whisper, may have errors on names), 'whisper-api' "
+        f"(OpenAI Whisper transcription, may have errors on names), or 'show-notes' "
         f"(notes only, no transcript - quotes will be absent). Use Worth Following Up On bullets to spawn deeper research."
     )
     fm = {

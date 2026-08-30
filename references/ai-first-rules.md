@@ -283,7 +283,7 @@ source-url: ""                # the URL the user pasted (Apple, RSS, etc.)
 guid: ""                      # episode GUID from RSS
 published: ""                 # publisher-provided publish date string
 duration: ""                  # publisher-provided duration string
-transcript-source: rss-transcript-tag | whisper-api | show-notes
+transcript-source: rss-transcript-tag | groq-whisper-api | whisper-api | show-notes
 tags: [research, podcast, ...]
 cost-usd: 0.0
 ai-first: true

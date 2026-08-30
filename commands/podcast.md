@@ -27,18 +27,19 @@ Use the obsidian-second-brain skill. Execute `/podcast [url]`:
    - Parses the RSS feed, extracts episode metadata (title, show, host, published, duration, audio URL, show notes).
    - Tries to obtain a transcript in this order:
      1. **`<podcast:transcript>` tag** in the RSS feed (free, fast, high fidelity).
-     2. **Whisper API**, only if `OPENAI_API_KEY` is set. Downloads audio (<=25 MB OpenAI per-file limit), transcribes via `whisper-1`. Approximate cost: $0.006/min.
-     3. **Show-notes-only fallback**. If no transcript path works, summarizes from RSS show notes alone. Quality drops; Notable Quotes will be empty.
+     2. **Groq-hosted Whisper**, only if `GROQ_API_KEY` is set (free tier). Downloads audio, re-encodes it to 32kbps mono so episodes up to ~4.5h fit in Groq's 25MB per-request cap (longer episodes are split into chunks with overlap and stitched). No cost on the free tier.
+     3. **Whisper API**, only if `OPENAI_API_KEY` is set. Downloads audio (<=25 MB OpenAI per-file limit), transcribes via `whisper-1`. Approximate cost: $0.006/min.
+     4. **Show-notes-only fallback**. If no transcript path works, summarizes from RSS show notes alone. Quality drops; Notable Quotes will be empty.
    - Sends transcript-or-shownotes to Grok for AI-first summarization.
    - Returns: TL;DR, Key Points, Notable Quotes, Themes & Topics, Guests & People Mentioned, Worth Following Up On.
 
 4. Show the script output verbatim to the user.
 
-5. **Default save behavior: saves automatically.** AI-first note written to `Research/Podcasts/YYYY-MM-DD - <episode-title-slug>.md` (hyphen separator, matches the existing `/youtube` and `/research` filename pattern). Frontmatter includes `show`, `host`, `episode-title`, `episode-url`, `feed-url`, `guid`, `published`, `duration`, `transcript-source` (one of `rss-transcript-tag` / `whisper-api` / `show-notes`), and tags.
+5. **Default save behavior: saves automatically.** AI-first note written to `Research/Podcasts/YYYY-MM-DD - <episode-title-slug>.md` (hyphen separator, matches the existing `/youtube` and `/research` filename pattern). Frontmatter includes `show`, `host`, `episode-title`, `episode-url`, `feed-url`, `guid`, `published`, `duration`, `transcript-source` (one of `rss-transcript-tag` / `groq-whisper-api` / `whisper-api` / `show-notes`), and tags.
 
 6. Plain English triggers: "summarize this podcast", "what's in this episode", "transcribe this podcast", or just pasting an Apple Podcasts URL with a question about content.
 
-7. If the podcast publishes neither a transcript tag nor usable show notes AND there's no `OPENAI_API_KEY`, the script will fail with a clear message. Surface it. Suggest the user either picks a podcast that publishes transcripts, or sets `OPENAI_API_KEY` for Whisper transcription.
+7. If no transcript path works and the show notes are empty or too short, the script fails with a clear message (exit code 1). Surface it. Suggest the user either picks a podcast that publishes transcripts, or sets `GROQ_API_KEY` (free-tier Groq Whisper) or `OPENAI_API_KEY` (paid Whisper API) for audio transcription.
 
 8. If the user asks to research someone or something mentioned in the "Worth Following Up On" or "Guests & People Mentioned" section, route that to `/research [topic]` (or `/obsidian-person` if it's a vault-worthy contact).
 
