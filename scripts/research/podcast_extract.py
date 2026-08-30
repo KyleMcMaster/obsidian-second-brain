@@ -187,12 +187,25 @@ def main(argv: list[str]) -> int:
         content=content,
     )
 
-    print(f"[/podcast] Summarizing via Grok (source: {transcript_source})...\n", file=sys.stderr)
-    try:
-        result = grok.call(prompt, command="podcast", max_output_tokens=3000)
-    except Exception as e:
-        print(f"\n❌ /podcast summarize failed: {e}", file=sys.stderr)
-        return 1
+    # Prefer Gemini for the summary when its key is set (generous free tier),
+    # fall back to Grok - transparently, since gemini.call mirrors grok.call's
+    # return shape. No Gemini key = exactly the old Grok-only behavior.
+    # Same pattern as /youtube (youtube_extract.py).
+    result = None
+    if os.environ.get("GEMINI_API_KEY", "").strip():
+        print("[/podcast] Summarizing via Gemini (free tier)...\n", file=sys.stderr)
+        try:
+            from .lib import gemini
+            result = gemini.call(prompt, command="podcast", max_output_tokens=3000)
+        except Exception as e:  # noqa: BLE001 - fall back to Grok on any Gemini failure
+            print(f"[/podcast] Gemini failed ({e}); falling back to Grok...", file=sys.stderr)
+    if result is None:
+        print(f"[/podcast] Summarizing via Grok (source: {transcript_source})...\n", file=sys.stderr)
+        try:
+            result = grok.call(prompt, command="podcast", max_output_tokens=3000)
+        except Exception as e:
+            print(f"\n❌ /podcast summarize failed: {e}", file=sys.stderr)
+            return 1
 
     print(f"# {title}")
     print(f"**Show:** {show} · **Host:** {host} · **Published:** {published}")
