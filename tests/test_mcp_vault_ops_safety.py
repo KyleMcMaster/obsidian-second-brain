@@ -105,7 +105,7 @@ def test_write_preserves_mode(vault):
     target = v / "note.md"
     target.chmod(0o600)
     ops.update_note("note.md", append="more")
-    if os.name != "nt":  # NTFS has no POSIX mode bits; chmod 600 reads back as 666
+    if os.name != "nt":  # Windows keeps no POSIX owner/group distinction; chmod 600 cannot be verified through st_mode there (it reads back 0o666)
         assert target.stat().st_mode & 0o777 == 0o600, "the rewrite dropped the permission bits"
     assert not list(v.glob(".*.tmp")), "a temp file survived a successful write"
 

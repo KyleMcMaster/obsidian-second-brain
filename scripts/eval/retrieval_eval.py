@@ -204,6 +204,44 @@ def _rank_of_gold(results: list[dict[str, Any]], gold: list[str]) -> int:
     return 0
 
 
+def _split_external_cmd(cmd: str) -> list[str]:
+    r"""Split RETRIEVAL_EVAL_EXTERNAL_CMD into argv.
+
+    Two forms. A JSON array (the value starts with "[") is the exact form: each
+    element is one argument and no shell quoting rules apply, only JSON's own
+    (a double quote inside a string is \", a backslash is \\, or write Windows
+    paths with forward slashes), so spaces, embedded quotes and empty arguments
+    pass through exactly:
+        ["bash", "C:/Program Files/x/engine.sh", "--out", "say \"hi\""]
+    A plain string is split with shell-like rules: POSIX shlex on macOS and
+    Linux; on Windows, where POSIX shlex would treat every backslash as an escape
+    and eat the separators of a path, non-POSIX splitting that keeps backslashes
+    and removes one layer of matching surrounding quotes per token. The plain
+    form covers a command plus simple arguments; anything with escaped quotes or
+    quotes inside an argument belongs in the JSON form.
+    """
+    import json
+    import shlex
+
+    stripped = cmd.strip()
+    if stripped.startswith("["):
+        try:
+            parts = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"RETRIEVAL_EVAL_EXTERNAL_CMD looks like a JSON array but does not parse: {exc}")
+        if not isinstance(parts, list) or not parts or not all(isinstance(p, str) for p in parts):
+            raise SystemExit("RETRIEVAL_EVAL_EXTERNAL_CMD as JSON must be a non-empty array of strings")
+        return parts
+    if os.name != "nt":
+        return shlex.split(cmd)
+    parts: list[str] = []
+    for token in shlex.split(cmd, posix=False):
+        if len(token) >= 2 and token[0] == token[-1] and token[0] in ("'", '"'):
+            token = token[1:-1]
+        parts.append(token)
+    return parts
+
+
 def _searcher(mode: str):
     """Return a (label, fn(query)->results) for the chosen retrieval mode.
 
@@ -231,20 +269,18 @@ def _searcher(mode: str):
         # the shipped search without being imported or vendored (pattern from
         # the structured-rag eval fork, fork-insights round 2).
         import os
-        import shlex
         import subprocess
         cmd = os.environ.get("RETRIEVAL_EVAL_EXTERNAL_CMD", "").strip()
         if not cmd:
             raise SystemExit(
                 "External mode needs RETRIEVAL_EVAL_EXTERNAL_CMD - a command that "
                 "takes the query as its final argument and prints ranked note "
-                "paths (JSON array or one per line)."
+                "paths (JSON array or one per line). The value is a plain command "
+                "line, or a JSON array of arguments for anything shell quoting "
+                "cannot express."
             )
 
-        # shlex.split runs in POSIX mode, where a backslash is an escape: a
-        # Windows engine path ("bash C:\Users\me\engine.sh") would lose its
-        # separators and the engine would never be found. Escape them there.
-        parts = shlex.split(cmd.replace("\\", "\\\\") if os.name == "nt" else cmd)
+        parts = _split_external_cmd(cmd)
 
         def _external(q: str) -> list[dict[str, Any]]:
             proc = subprocess.run(

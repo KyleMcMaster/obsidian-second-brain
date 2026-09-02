@@ -781,7 +781,14 @@ chmod 600 ~/.config/obsidian-second-brain/.env
 # then paste the keys from the table below into that file
 ```
 
-**On Windows** (Git Bash / MSYS2) the file lives under your Windows profile, `%USERPROFILE%\.config\obsidian-second-brain\.env`: that is where Python (`Path.home()`), Claude Code, and the bash scripts all resolve `~`, even when a corporate `HOME` points at another drive. To keep the file anywhere else, set `OBSIDIAN_ENV_FILE` to its full path; every half of the toolkit (the research loaders, the eval, the MCP server, the write-time hook) honors it.
+**On Windows** (Git Bash / MSYS2) the file lives under your Windows profile, `%USERPROFILE%\.config\obsidian-second-brain\.env`: that is where Python (`Path.home()`), Claude Code, and the bash scripts resolve the home, even when a corporate `HOME` points at another drive. Bash's own `~` still follows `HOME`, so on such a machine create the file from `USERPROFILE` instead of with the commands above:
+
+```bash
+CONFIG="$(cygpath -u "$USERPROFILE")/.config/obsidian-second-brain"
+mkdir -p "$CONFIG" && touch "$CONFIG/.env" && chmod 600 "$CONFIG/.env"
+```
+
+To keep the file anywhere else, set `OBSIDIAN_ENV_FILE` to its full path; every reader and writer (the research loaders, the eval, the MCP server, the write-time hook, `install.sh`, `scripts/setup.sh`) honors it. On Windows give it a native path (`C:/Users/me/osb.env`, or with backslashes), which bash and Python can both open; the Git Bash spellings `/c/...` and `/cygdrive/c/...` mean something to bash only. This assumes the native Windows Python that `uv` installs; a Cygwin- or MSYS-built Python resolves its home from `HOME` instead, so use `OBSIDIAN_ENV_FILE` there.
 
 **Installed from a clone?** Run `install.sh` and answer "y" to the research prompt, which does the same thing for you. Or do it manually:
 
