@@ -32,6 +32,7 @@ XAI_API_KEY optional (enables the LLM question generator).
 
 from __future__ import annotations
 
+import os
 import argparse
 import json
 import re
@@ -53,7 +54,10 @@ except (Exception, SystemExit):  # pragma: no cover - fall back to a bare dotenv
     try:
         from dotenv import load_dotenv
 
-        load_dotenv(Path.home() / ".config" / "obsidian-second-brain" / ".env")
+        load_dotenv(Path(
+            os.environ.get("OBSIDIAN_ENV_FILE")
+            or (Path.home() / ".config" / "obsidian-second-brain" / ".env")
+        ).expanduser())
     except Exception:
         pass
 

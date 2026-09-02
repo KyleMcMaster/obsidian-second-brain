@@ -1273,6 +1273,75 @@ def test_validate_hook_matches_windows_backslash_paths(tmp_path):
     assert r.returncode == 0 and r.stdout == ""
 
 
+def test_validate_hook_env_fallback_uses_the_platform_home(tmp_path):
+    """The optional .env fallback must live where the Python tools look for it.
+    Path.home() reads USERPROFILE on Windows and ignores HOME, while the hook
+    read $HOME; on a machine whose HOME points at another drive (a corporate
+    roaming home) the two halves resolved different files and a user following
+    the README configured one half only. On Windows shells the hook now uses
+    USERPROFILE; elsewhere HOME is the home and nothing changes."""
+    hook = REPO_ROOT / "hooks/validate-ai-first.sh"
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    bad = vault / "bad.md"
+    bad.write_text("# bad note\n", encoding="utf-8")
+    other_home = tmp_path / "other-home"
+    platform_home = tmp_path / "platform-home"
+    for home in (other_home, platform_home):
+        (home / ".config" / "obsidian-second-brain").mkdir(parents=True)
+    (platform_home / ".config" / "obsidian-second-brain" / ".env").write_text(
+        f"OBSIDIAN_VAULT_PATH={vault}\n", encoding="utf-8"
+    )
+
+    env = dict(os.environ)
+    env.pop("OBSIDIAN_VAULT_PATH", None)
+    env.pop("OBSIDIAN_ENV_FILE", None)
+    if os.name == "nt":
+        env["USERPROFILE"] = str(platform_home)
+        env["HOME"] = str(other_home)  # won before the fix, and found nothing
+    else:
+        env["HOME"] = str(platform_home)
+        env.pop("USERPROFILE", None)
+    r = subprocess.run(
+        ["bash", str(hook)],
+        input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(bad)}}),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "AI-first warning" in json.loads(r.stdout)["systemMessage"], (
+        "the hook must find the .env under the platform home and validate the note"
+    )
+
+
+def test_research_config_honors_env_file_override(tmp_path):
+    """OBSIDIAN_ENV_FILE points every half of the toolkit at one file. The MCP
+    server and the write-time hook already honored it (#160); the research
+    loaders and the retrieval eval read only the default location, so a user
+    whose config lives elsewhere (or whose HOME and USERPROFILE disagree on
+    Windows) could not steer them. Environment still wins over the file."""
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    env_file = tmp_path / "elsewhere.env"
+    env_file.write_text(f"OBSIDIAN_VAULT_PATH={vault}\n", encoding="utf-8")
+    empty_home = tmp_path / "home"
+    empty_home.mkdir()
+    env = dict(os.environ, OBSIDIAN_ENV_FILE=str(env_file),
+               HOME=str(empty_home), USERPROFILE=str(empty_home))
+    env.pop("OBSIDIAN_VAULT_PATH", None)
+    r = subprocess.run(
+        [sys.executable, "-c",
+         "from scripts.research.lib import config, source_config; "
+         "print(config.VAULT_PATH); print(source_config._ENV_PATH)"],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, encoding="utf-8",
+    )
+    assert r.returncode == 0, r.stderr
+    lines = r.stdout.strip().splitlines()
+    assert lines[0] == str(vault), "config.py must read the vault path from OBSIDIAN_ENV_FILE"
+    assert lines[1] == str(env_file), "source_config.py must load the same file"
+
+
 def test_recall_hook_contract(tmp_path):
     """Bounded recall: inert without the double gate, injects a bounded brief
     on a relevant prompt, abstains (silently, exit 0) on an irrelevant one,

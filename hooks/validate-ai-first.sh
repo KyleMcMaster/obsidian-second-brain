@@ -96,7 +96,16 @@ FILE=$(normalize_path "$FILE")
 # path, swept when the hook turned out never to have been wired at all.
 VAULT="${OBSIDIAN_VAULT_PATH:-}"
 if [[ -z "$VAULT" ]]; then
-  ENV_FILE="${OBSIDIAN_ENV_FILE:-$HOME/.config/obsidian-second-brain/.env}"
+  # Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
+  # Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
+  # Code resolve ~ to there; HOME can point at another drive (a corporate roaming
+  # home) and would split the config between the bash and Python halves.
+  # Elsewhere HOME is the home. Uses bash 3.2 features only.
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*) OSB_HOME="$(cygpath -u "${USERPROFILE:-$HOME}" 2>/dev/null || printf '%s' "${USERPROFILE:-$HOME}")" ;;
+    *) OSB_HOME="$HOME" ;;
+  esac
+  ENV_FILE="${OBSIDIAN_ENV_FILE:-$OSB_HOME/.config/obsidian-second-brain/.env}"
   if [[ -r "$ENV_FILE" ]]; then
     VAULT=$(sed -n 's/^[[:space:]]*OBSIDIAN_VAULT_PATH[[:space:]]*=[[:space:]]*//p' "$ENV_FILE" \
       | tail -n 1 | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")

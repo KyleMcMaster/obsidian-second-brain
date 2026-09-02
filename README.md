@@ -781,6 +781,8 @@ chmod 600 ~/.config/obsidian-second-brain/.env
 # then paste the keys from the table below into that file
 ```
 
+**On Windows** (Git Bash / MSYS2) the file lives under your Windows profile, `%USERPROFILE%\.config\obsidian-second-brain\.env`: that is where Python (`Path.home()`), Claude Code, and the bash scripts all resolve `~`, even when a corporate `HOME` points at another drive. To keep the file anywhere else, set `OBSIDIAN_ENV_FILE` to its full path; every half of the toolkit (the research loaders, the eval, the MCP server, the write-time hook) honors it.
+
 **Installed from a clone?** Run `install.sh` and answer "y" to the research prompt, which does the same thing for you. Or do it manually:
 
 ```bash
@@ -869,7 +871,7 @@ The maintenance layer, given a name. Its one rule: every stored fact must be tim
 Approximate per-call costs as of 2026-04: `/x-read` ~$0.05, `/x-pulse` ~$0.13, `/research` ~$0.04, `/research-deep` ~$0.40-$0.80, `/youtube` ~$0.04, `/podcast` ~$0.04 Grok call (plus ~$0.006/min if Whisper is used; free if RSS provides a `<podcast:transcript>` tag or you accept the show-notes fallback). Costs for paid calls (Grok, Perplexity, Gemini) are logged to `~/.research-toolkit/usage.log` for visibility. No hard caps. You're trusted to monitor your own spend.
 
 ### Can I use this on Windows or Linux?
-The core vault commands work anywhere Claude Code runs. `install.sh` supports Linux, macOS, and Windows (MSYS2/Git Bash): on Linux/macOS slash commands are symlinked so `git pull` keeps them current; on Windows they are copied and `update.sh` refreshes them. The research toolkit auto-open step uses `open` on macOS, `xdg-open` on Linux, and `notepad` on Windows.
+The core vault commands work anywhere Claude Code runs. `install.sh` supports Linux, macOS, and Windows (MSYS2/Git Bash): on Linux/macOS slash commands are symlinked so `git pull` keeps them current; on Windows they are copied and `update.sh` refreshes them. The research toolkit auto-open step uses `open` on macOS, `xdg-open` on Linux, and `notepad` on Windows. On Windows the config file and Claude Code state hang off `%USERPROFILE%` (see the research toolkit section); `OBSIDIAN_ENV_FILE` relocates the config file for every part of the toolkit.
 
 ### Can I have a separate vault per project (multi-repo workflows)?
 Yes. The default `scripts/setup.sh` writes `OBSIDIAN_VAULT_PATH` globally to `~/.claude/settings.json`, but every hook in this skill reads that env var at fire-time. Claude Code merges per-project `.claude/settings.json` on top of the global one, so you can put `{"env": {"OBSIDIAN_VAULT_PATH": "/path/to/repo-vault"}}` in each repo's `.claude/settings.json` and Claude will use that repo's vault whenever you launch a session from that directory. The slash commands and hooks remain globally installed; only the vault path changes. Full recipe in [`SKILL.md`](SKILL.md#per-project-vaults-multi-repo-workflows). One thing this does NOT give you: isolation within a single vault (no `--scope` on commands yet).

@@ -6,7 +6,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 CONFIG_DIR = Path.home() / ".config" / "obsidian-second-brain"
-ENV_PATH = CONFIG_DIR / ".env"
+# OBSIDIAN_ENV_FILE points every half of the toolkit (this loader, the free-mode
+# source config, the retrieval eval, the MCP server, the write-time hook) at one
+# file. Environment variables still win over anything the file sets.
+ENV_PATH = Path(os.environ.get("OBSIDIAN_ENV_FILE") or (CONFIG_DIR / ".env")).expanduser()
 
 load_dotenv(ENV_PATH)
 

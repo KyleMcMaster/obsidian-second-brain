@@ -22,7 +22,16 @@ set -euo pipefail
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="${OBSIDIAN_SECOND_BRAIN_HOME:-$(cd "$SELF_DIR/.." && pwd)}"
 CODEX_BIN="${CODEX_BIN:-codex}"
-CONFIG_FILE="$HOME/.config/obsidian-second-brain/config.env"
+# Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
+# Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
+# Code resolve ~ to there; HOME can point at another drive (a corporate roaming
+# home) and would split the config between the bash and Python halves.
+# Elsewhere HOME is the home. Uses bash 3.2 features only.
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*) OSB_HOME="$(cygpath -u "${USERPROFILE:-$HOME}" 2>/dev/null || printf '%s' "${USERPROFILE:-$HOME}")" ;;
+  *) OSB_HOME="$HOME" ;;
+esac
+CONFIG_FILE="$OSB_HOME/.config/obsidian-second-brain/config.env"
 [[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
 
 PRINT_ONLY=0
