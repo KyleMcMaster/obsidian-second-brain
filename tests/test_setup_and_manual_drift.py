@@ -18,6 +18,7 @@ not diff prose - that would be noise - it pins the specific facts that drifted.
 
 from __future__ import annotations
 
+import os
 import re
 import stat
 import subprocess
@@ -52,8 +53,9 @@ def test_setup_preserves_the_env_file_mode(tmp_path):
          '&& mv "$1.tmp" "$1" && chmod 600 "$1"', "_", str(env)],
         check=True, capture_output=True,
     )
-    mode = stat.S_IMODE(env.stat().st_mode)
-    assert mode == 0o600, f"the API-key file ended at {oct(mode)}, readable by others"
+    if os.name != "nt":  # NTFS has no POSIX mode bits; the umask/chmod pipeline is POSIX-only
+        mode = stat.S_IMODE(env.stat().st_mode)
+        assert mode == 0o600, f"the API-key file ended at {oct(mode)}, readable by others"
 
 
 def test_install_creates_the_env_file_restricted():

@@ -738,7 +738,7 @@ def test_link_graph_resolves_unicode_composition(tmp_path):
     )
     graph = json.loads(subprocess.run(
         [sys.executable, str(REPO_ROOT / "scripts/link_graph.py"), "--path", str(vault)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, encoding="utf-8", check=True,
     ).stdout)
     assert graph["stats"]["dangling_link_count"] == 0, (
         "a composed link to a decomposed filename must resolve, not dangle"
@@ -777,7 +777,7 @@ def test_link_graph_typed_edges_and_lint(tmp_path):
 
     graph = json.loads(subprocess.run(
         [sys.executable, str(REPO_ROOT / "scripts/link_graph.py"), "--path", str(vault)],
-        capture_output=True, text=True, check=True,
+        capture_output=True, text=True, encoding="utf-8", check=True,
     ).stdout)
     # Overlay is separate from connectivity: three honored typed edges, and the
     # legacy scalar is read as a typed edge too.
@@ -1034,6 +1034,7 @@ def test_research_key_in_config_env_selects_paid_mode(tmp_path, module, paid_fn,
 
     env = os.environ.copy()
     env["HOME"] = str(fake_home)
+    env["USERPROFILE"] = str(fake_home)  # what Path.home() reads on Windows; HOME is ignored there
     env.pop("PERPLEXITY_API_KEY", None)
     env.pop("OBSIDIAN_VAULT_PATH", None)
 

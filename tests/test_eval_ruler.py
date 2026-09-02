@@ -9,6 +9,7 @@ straightened ruler without needing Ollama.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -136,6 +137,10 @@ def test_generate_refuses_to_overwrite_baseline(tmp_path):
     cases.write_text('{"q": "old question", "gold": ["topic.md"]}\n', encoding="utf-8")
 
     env = {"OBSIDIAN_VAULT_PATH": str(vault), "PATH": "/usr/bin:/bin"}
+    if os.name == "nt":
+        # Path.home() reads USERPROFILE on Windows (HOME is ignored) and raises
+        # "Could not determine home directory" without it.
+        env["USERPROFILE"] = str(tmp_path)
     cmd = [sys.executable, "scripts/eval/retrieval_eval.py",
            "--generate", "1", "--cases", str(cases)]
     result = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True,

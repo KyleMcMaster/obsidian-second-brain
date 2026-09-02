@@ -237,9 +237,14 @@ def _searcher(mode: str):
                 "paths (JSON array or one per line)."
             )
 
+        # shlex.split runs in POSIX mode, where a backslash is an escape: a
+        # Windows engine path ("bash C:\Users\me\engine.sh") would lose its
+        # separators and the engine would never be found. Escape them there.
+        parts = shlex.split(cmd.replace("\\", "\\\\") if os.name == "nt" else cmd)
+
         def _external(q: str) -> list[dict[str, Any]]:
             proc = subprocess.run(
-                shlex.split(cmd) + [q],
+                parts + [q],
                 capture_output=True, text=True, timeout=120,
             )
             if proc.returncode != 0:
@@ -331,6 +336,12 @@ def evaluate(cases_path: Path, as_json: bool, mode: str = "lexical") -> int:
     }
 
     if as_json:
+        # Force UTF-8 stdout: on Windows a pipe defaults to cp1252, which cannot
+        # encode every character a case question or note path may carry.
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
         print(json.dumps({"summary": summary, "cases": per_case}, ensure_ascii=False, indent=2))
         return 0
 
