@@ -1227,6 +1227,51 @@ def test_validate_hook_accepts_vscode_extension_payload(tmp_path):
     assert_warn(run({"tool_name": "Write", "tool_input": {"file_path": str(bad)}}))
     assert_warn(run({"tool_name": "create_file", "tool_input": {"filePath": str(bad)}}))
 
+
+def test_validate_hook_matches_windows_backslash_paths(tmp_path):
+    """On Windows, Claude Code hands the hook tool_input.file_path with
+    backslashes ("C:\\Users\\...") while OBSIDIAN_VAULT_PATH is written with
+    forward slashes. The vault-scope check compared the two as strings, so the
+    hook exited 0 before reading the note - a silent no-op on every Windows
+    install (found on a fresh plugin install: two deliberately bad writes, no
+    warning). Both sides are now normalized to forward slashes and a lowercase
+    drive letter. Windows path forms only exist on Windows, so this runs there
+    and skips elsewhere; the POSIX form is covered by the tests above."""
+    if os.name != "nt":
+        pytest.skip("Windows path forms only exist on Windows")
+    hook = REPO_ROOT / "hooks/validate-ai-first.sh"
+    bad = tmp_path / "bad.md"
+    bad.write_text("# bad note\njust a test\n", encoding="utf-8")
+    backslash_file = str(bad)
+    assert "\\" in backslash_file, "expected the native Windows path form"
+    slash_vault = tmp_path.as_posix()
+
+    def run(file_path, vault):
+        return subprocess.run(
+            ["bash", str(hook)],
+            input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": file_path}}),
+            env=dict(os.environ, OBSIDIAN_VAULT_PATH=vault),
+            capture_output=True,
+            text=True,
+        )
+
+    # Backslash file path against a forward-slash vault path: must warn.
+    r = run(backslash_file, slash_vault)
+    assert r.returncode == 0, r.stderr
+    assert "AI-first warning" in json.loads(r.stdout)["systemMessage"]
+
+    # The drive letter's case must not matter either.
+    r = run(backslash_file, slash_vault[0].swapcase() + slash_vault[1:])
+    assert r.returncode == 0, r.stderr
+    assert "AI-first warning" in json.loads(r.stdout)["systemMessage"]
+
+    # A file outside the vault stays silent regardless of path form.
+    outside = tmp_path.parent / "outside-the-vault.md"
+    outside.write_text("# outside\n", encoding="utf-8")
+    r = run(str(outside), slash_vault)
+    assert r.returncode == 0 and r.stdout == ""
+
+
 def test_recall_hook_contract(tmp_path):
     """Bounded recall: inert without the double gate, injects a bounded brief
     on a relevant prompt, abstains (silently, exit 0) on an irrelevant one,

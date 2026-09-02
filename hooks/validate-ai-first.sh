@@ -55,6 +55,22 @@ emit_ai_first_warning() {
   exit 0
 }
 
+# Compare paths in one form: forward slashes and a lowercase drive letter (the
+# same normalization hooks/load_vault_context.py applies). On Windows, Claude
+# Code hands the hook tool_input.file_path with backslashes ("C:\Users\...")
+# while OBSIDIAN_VAULT_PATH is written with forward slashes, so the plain
+# prefix match below never hit and the hook was a silent no-op there. Uses
+# bash 3.2 features only (macOS ships 3.2).
+normalize_path() {
+  local p="${1//\\//}"
+  local drive
+  if [[ "$p" =~ ^([A-Za-z]):(.*)$ ]]; then
+    drive=$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')
+    p="${drive}:${BASH_REMATCH[2]}"
+  fi
+  printf '%s' "$p"
+}
+
 INPUT=$(cat)
 
 # Write/Edit: tool_input.file_path. VS Code create_file: tool_input.filePath.
@@ -68,6 +84,7 @@ FILE=$(printf '%s' "$INPUT" | jq -r '
 
 # Bail silently on unparseable input or empty path
 [[ -z "$FILE" ]] && exit 0
+FILE=$(normalize_path "$FILE")
 [[ "$FILE" == *.md ]] || exit 0
 [[ -f "$FILE" ]] || exit 0
 
@@ -86,7 +103,7 @@ if [[ -z "$VAULT" ]]; then
   fi
 fi
 [[ -z "$VAULT" ]] && exit 0
-VAULT="${VAULT%/}"
+VAULT=$(normalize_path "${VAULT%/}")
 case "$FILE" in
   "$VAULT"/*) ;;
   *) exit 0 ;;
