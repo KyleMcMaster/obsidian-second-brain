@@ -37,9 +37,18 @@ import yaml
 # vault_stats. Without it a note whose opening fence carried a trailing space
 # had frontmatter to those two and none here, so the export wrote the
 # frontmatter into the body as prose and typed the note `note`.
+# `\r?\n` on each fence for the same reason: handed the byte-exact text of a
+# note saved with CRLF line endings (merge_notes.py passes note_io's read
+# straight in; this script's own text-mode read normalizes newlines first),
+# the pattern saw no frontmatter at all, while vault_health and vault_stats
+# read the same text correctly because their `\s*` absorbs the `\r`. PyYAML
+# reads the `\r\n` inside the block as line breaks, so the captured text
+# needs no further normalization. After the closing fence a whole terminator
+# (`\n` or `\r\n`) is optional, not its two halves separately, so a body that
+# starts with a bare `\r` keeps it, as it did before.
 # Two groups (fm, body) is this module's own shape; the pattern is pinned to
 # vault_scan.FRONTMATTER_RE by tests/test_frontmatter_parity.py.
-FM_RE = re.compile(r"^---[ \t]*\n(.*?)\n---[ \t]*\n?(.*)$", re.DOTALL)
+FM_RE = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n)?(.*)$", re.DOTALL)
 WIKILINK_RE = re.compile(r"(!?)\[\[([^\]]+)\]\]")
 # Compared lowercased; any folder ENDING in "templates" is also skipped (matching
 # vault_health.load_vault), so the canonical capital Templates/ stays out too.
@@ -68,6 +77,12 @@ def parse_note(text):
     not guess: the whole text rides along as body so no prose is dropped, and
     the type falls back to plain "note", never the folder name. A note with no
     frontmatter at all is NOT malformed - folder inference stays fair game."""
+    # A UTF-8 BOM ahead of the opening fence hid the whole block. The export
+    # reads with utf-8-sig, but merge_notes hands over note_io's byte-exact
+    # text, BOM included, and then carried the retired note's values into the
+    # canonical note as its own; skip it the way vault_scan.split_frontmatter does.
+    if text.startswith("\ufeff"):
+        text = text[1:]
     m = FM_RE.match(text)
     if not m:
         return {}, text, False

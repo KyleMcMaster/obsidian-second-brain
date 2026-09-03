@@ -12,7 +12,7 @@ defaults below applied when unset.
 
 Recognized environment variables (all optional):
   RESEARCH_CONTACT_EMAIL          polite-pool email for arXiv/CrossRef/OpenAlex User-Agent
-  RESEARCH_CACHE_TTL_HOURS        source-result cache TTL (default 24)
+  RESEARCH_CACHE_TTL_HOURS        source-result cache TTL (default 24; 0 means every lookup misses)
   RESEARCH_SEARXNG_INSTANCES      comma-separated SearXNG base URLs (DuckDuckGo fallback)
   RESEARCH_ARXIV_SECONDS          arXiv politeness delay (default 3.0)
   RESEARCH_REDDIT_SECONDS         Reddit politeness delay (default 0.5)

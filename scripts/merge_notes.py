@@ -171,12 +171,12 @@ def _load_note(vault: Path, rel: str) -> tuple:
     fm, body, malformed = parse_note(text)
     if malformed:
         raise SystemExit(f"frontmatter is malformed YAML, fix it before merging: {rel}")
-    return fm, body
+    return fm, body, text.startswith("\ufeff")
 
 
 def compute_merge(vault: Path, canonical_rel: str, retire_rel: str, merged_body: str) -> MergeResult:
-    canonical_fm, _ = _load_note(vault, canonical_rel)
-    retired_fm, _ = _load_note(vault, retire_rel)
+    canonical_fm, _, canonical_bom = _load_note(vault, canonical_rel)
+    retired_fm, _, retired_bom = _load_note(vault, retire_rel)
     retired_title = Path(retire_rel).stem
     canonical_title = Path(canonical_rel).stem
 
@@ -185,7 +185,10 @@ def compute_merge(vault: Path, canonical_rel: str, retire_rel: str, merged_body:
     )
     if conflicts:
         merged_fm["merged_from"]["path"] = retire_rel
-    canonical_text = dump_frontmatter(merged_fm) + "\n" + merged_body.lstrip("\n")
+    # A note that carried a UTF-8 BOM keeps it (the redirect stub below likewise):
+    # the file is rewritten whole, but a byte an editor put there stays there.
+    bom = "\ufeff" if canonical_bom else ""
+    canonical_text = bom + dump_frontmatter(merged_fm) + "\n" + merged_body.lstrip("\n")
     if not canonical_text.endswith("\n"):
         canonical_text += "\n"
 
@@ -209,7 +212,8 @@ def compute_merge(vault: Path, canonical_rel: str, retire_rel: str, merged_body:
         "ai-first": True,
     }
     redirect_text = (
-        dump_frontmatter(redirect_fm)
+        ("\ufeff" if retired_bom else "")
+        + dump_frontmatter(redirect_fm)
         + f"\nThis note was merged into [[{link_target}]] on {today}. "
         "See the canonical note for current content.\n"
     )

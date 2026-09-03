@@ -51,7 +51,11 @@ def vault_scan(topic: str) -> list[dict]:
             continue
         for path in root.rglob("*.md"):
             try:
-                text = path.read_text(errors="ignore").lower()
+                # encoding named: vault notes are UTF-8 (Obsidian writes them so)
+                # and the platform default on Windows is the ANSI code page
+                # (cp1252 on a Western-European system), where a CJK topic then
+                # matched nothing.
+                text = path.read_text(encoding="utf-8", errors="ignore").lower()
             except OSError:
                 continue
             score = sum(text.count(k) for k in keywords)
@@ -67,12 +71,20 @@ def vault_scan(topic: str) -> list[dict]:
     return hits[:MAX_BASELINE_NOTES]
 
 
+def _excerpt(abs_path: str) -> str:
+    """The first MAX_BASELINE_CHARS_PER_NOTE characters of a vault note, read as
+    UTF-8 (Obsidian's encoding): the platform default on Windows is the ANSI
+    code page (cp1252 on a Western-European system), where every non-ASCII
+    character in an excerpt went onward as mojibake."""
+    text = Path(abs_path).read_text(encoding="utf-8", errors="ignore")
+    return text[:MAX_BASELINE_CHARS_PER_NOTE].strip()
+
+
 def load_baseline(hits: list[dict]) -> str:
     chunks = []
     for h in hits:
         try:
-            text = Path(h["abs_path"]).read_text(errors="ignore")[:MAX_BASELINE_CHARS_PER_NOTE]
-            chunks.append(f"### [[{h['path']}]] (score={h['score']})\n\n{text.strip()}\n")
+            chunks.append(f"### [[{h['path']}]] (score={h['score']})\n\n{_excerpt(h['abs_path'])}\n")
         except OSError:
             continue
     return "\n---\n".join(chunks) if chunks else "(vault has no existing notes referencing this topic)"
@@ -183,7 +195,7 @@ def run_free_deep(topic: str, academic: bool) -> int:
     baseline_notes = []
     for h in hits:
         try:
-            excerpt = Path(h["abs_path"]).read_text(errors="ignore")[:MAX_BASELINE_CHARS_PER_NOTE].strip()
+            excerpt = _excerpt(h["abs_path"])
         except OSError:
             excerpt = ""
         baseline_notes.append({"path": h["path"], "score": h["score"], "excerpt": excerpt})

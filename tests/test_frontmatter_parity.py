@@ -48,6 +48,55 @@ def test_all_frontmatter_patterns_agree_on_a_trailing_space_fence():
         assert m.group(1).strip() == "type: note", f"{name} captured {m.group(1)!r}"
 
 
+CRLF_FENCE = "---\r\ntype: note\r\ntags: [a]\r\n---\r\n\r\nbody\r\n"
+
+
+def test_all_frontmatter_patterns_agree_on_a_crlf_note():
+    """S9 again, on line endings. The whitespace class vault_health and
+    vault_stats use after a fence absorbs a carriage return; the space-or-tab
+    class in export_okf and vault_scan did not, so the byte-exact text of a
+    note saved with CRLF (a Windows editor, or one note_io preserved as it was)
+    had frontmatter to two tools and none to the other two - and merge_notes.py,
+    which passes note_io's read straight to export_okf's parser, lost that
+    note's fields in the merge. Its own tests hit this on Windows, where
+    write_text() saves the fixtures with CRLF."""
+    import export_okf
+    import vault_health
+    import vault_scan
+    import vault_stats
+
+    results = {
+        "vault_health": vault_health.FRONTMATTER_RE.match(CRLF_FENCE),
+        "vault_stats": vault_stats.FRONTMATTER.match(CRLF_FENCE),
+        "export_okf": export_okf.FM_RE.match(CRLF_FENCE),
+        "vault_scan": vault_scan.FRONTMATTER_RE.match(CRLF_FENCE),
+    }
+    disagreed = [n for n, m in results.items() if not m]
+    assert not disagreed, f"{disagreed} do not see the frontmatter of a CRLF note"
+    for name, m in results.items():
+        assert m.group(1).splitlines() == ["type: note", "tags: [a]"], (
+            f"{name} captured {m.group(1)!r}"
+        )
+
+    fm, body, malformed = export_okf.parse_note(CRLF_FENCE)
+    assert (fm, malformed) == ({"type": "note", "tags": ["a"]}, False)
+    assert body == "\r\nbody\r\n", "the body keeps its line endings byte-exact"
+    fm_text, body = vault_scan.split_frontmatter(CRLF_FENCE)
+    assert fm_text.splitlines() == ["type: note", "tags: [a]"] and body == "\r\nbody\r\n"
+
+
+def test_parse_note_skips_a_bom_like_the_canonical_parser():
+    """export_okf reads with utf-8-sig, but merge_notes hands parse_note the
+    byte-exact text note_io returns, BOM included; the BOM then hid the whole
+    frontmatter and the merge carried the retired note's values over as the
+    canonical note's own (test_merge_notes pins the end-to-end case)."""
+    import export_okf
+
+    fm, body, malformed = export_okf.parse_note("\ufeff---\ntype: note\n---\n\nbody\n")
+    assert (fm, malformed) == ({"type": "note"}, False), "a BOM hid the frontmatter"
+    assert body == "\nbody\n"
+
+
 def test_the_canonical_parser_handles_the_awkward_cases():
     from vault_scan import split_frontmatter
 

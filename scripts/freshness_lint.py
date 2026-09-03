@@ -51,7 +51,7 @@ import json
 import re
 import sys
 from datetime import date, datetime
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from vault_scan import BASE_EXCLUDE_DIRS  # noqa: E402
 
@@ -343,6 +343,17 @@ def lint_file(path: Path, rel: str, cfg: dict, today: date) -> list[dict]:
 SKIP_DIRS = frozenset(d.lower() for d in BASE_EXCLUDE_DIRS)  # see scripts/vault_scan.py
 
 
+def _report_path(path: PurePath, root: PurePath) -> str:
+    """The `file` of a finding: vault-relative and forward-slash on every platform.
+
+    The report is the contract (the --json output, the tests, and the vault's
+    own link form), and str(Path) is backslash-separated on Windows, so a
+    finding would have named Boards/Work.md with backslashes there and with a
+    slash everywhere else.
+    """
+    return path.relative_to(root).as_posix()
+
+
 def lint_folder(root: Path, today: date | None = None) -> dict:
     today = today or datetime.now().date()
     cfg = load_config(root)
@@ -354,7 +365,7 @@ def lint_folder(root: Path, today: date | None = None) -> dict:
             continue
         if exempt and any("/".join(parts[:i + 1]) in exempt for i in range(len(parts) - 1)):
             continue
-        findings.extend(lint_file(path, str(path.relative_to(root)), cfg, today))
+        findings.extend(lint_file(path, _report_path(path, root), cfg, today))
     errors = sum(1 for f in findings if f["severity"] == "error")
     warnings = sum(1 for f in findings if f["severity"] == "warning")
     return {"errors": errors, "warnings": warnings, "findings": findings}

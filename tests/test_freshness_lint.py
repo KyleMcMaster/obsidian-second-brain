@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import sys
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from freshness_lint import lint_folder  # noqa: E402
+from freshness_lint import _report_path, lint_folder  # noqa: E402
 
 TODAY = date(2026, 7, 13)
 
@@ -304,3 +304,17 @@ def test_directive_in_frontmatter_is_inert(tmp_path):
           '---\nnote: "<!-- freshness: example -->"\n---\n# Notes\n\nTimeless text.\n')
     report = lint_folder(tmp_path, today=TODAY)
     assert not report["findings"]
+
+
+def test_findings_name_files_with_forward_slashes():
+    """The `file` of a finding is the report's contract (the --json output,
+    these tests, and the vault's own link form), so it must read Boards/Work.md
+    on every platform; str(Path) is backslash-separated on Windows, where the
+    obsidian-comments test above failed on exactly that. A PureWindowsPath
+    makes the case run on the ubuntu CI runner too (B40's companion test in
+    test_frontmatter_parity.py does the same for vault_health)."""
+    root = PureWindowsPath("C:/vault")
+    note = root / "Boards" / "Work.md"
+    assert "\\" in str(note), "sanity: this is the form the finding used to carry"
+    assert _report_path(note, root) == "Boards/Work.md"
+    assert _report_path(root / "note.md", root) == "note.md"

@@ -61,7 +61,11 @@ def vault_scan(topic: str) -> list[dict]:
             if "Research/NotebookLM/" in str(path):
                 continue
             try:
-                text = path.read_text(errors="ignore").lower()
+                # encoding named: vault notes are UTF-8 (Obsidian writes them so)
+                # and the platform default on Windows is the ANSI code page
+                # (cp1252 on a Western-European system), where a CJK topic then
+                # matched nothing.
+                text = path.read_text(encoding="utf-8", errors="ignore").lower()
             except OSError:
                 continue
             score = sum(text.count(k) for k in keywords)
@@ -177,6 +181,28 @@ def upload_and_wait(client: genai.Client, store_name: str, hit: dict) -> None:
             pass
 
 
+def save_note(
+    topic: str, slug: str, today: str, used_model: str, hits: list[dict], response_text: str
+) -> Path:
+    """Write the synthesis note. UTF-8 by name: the platform default on Windows
+    is the ANSI code page, which cannot encode a body carrying a CJK topic
+    (UnicodeEncodeError, on a Western-European system) and stores the
+    characters it can encode as bytes Obsidian reads as mojibake."""
+    NOTEBOOKLM_DIR.mkdir(parents=True, exist_ok=True)
+    note_path = NOTEBOOKLM_DIR / f"{today} - {slug}.md"
+    body = NOTEBOOKLM_NOTE_TEMPLATE.format(
+        date=today,
+        topic=topic,
+        slug=slug,
+        model=used_model,
+        baseline_count=len(hits),
+        baseline_links="\n".join(f"- [[{h['path']}]]" for h in hits),
+        response=response_text,
+    )
+    note_path.write_text(body, encoding="utf-8")
+    return note_path
+
+
 def run(topic: str) -> int:
     api_key = get_required("GEMINI_API_KEY")
     hits = vault_scan(topic)
@@ -256,18 +282,7 @@ def run(topic: str) -> int:
         except Exception as e:
             print(f"WARNING: failed to delete store {store.name}: {e}", file=sys.stderr)
 
-    NOTEBOOKLM_DIR.mkdir(parents=True, exist_ok=True)
-    note_path = NOTEBOOKLM_DIR / f"{today} - {slug}.md"
-    body = NOTEBOOKLM_NOTE_TEMPLATE.format(
-        date=today,
-        topic=topic,
-        slug=slug,
-        model=used_model,
-        baseline_count=len(hits),
-        baseline_links="\n".join(f"- [[{h['path']}]]" for h in hits),
-        response=response_text,
-    )
-    note_path.write_text(body)
+    note_path = save_note(topic, slug, today, used_model, hits, response_text)
 
     payload = {
         "topic": topic,

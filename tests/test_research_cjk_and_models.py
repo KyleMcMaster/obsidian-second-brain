@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import sys
 import types
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -75,6 +76,122 @@ def test_vault_scan_finds_cjk_topic(tmp_path, monkeypatch):
         paths = [h["path"] for h in hits]
         assert any("morning.md" in p for p in paths), (mod.__name__, paths)
         assert not any("unrelated.md" in p for p in paths), (mod.__name__, paths)
+
+
+@pytest.fixture
+def cp1252_default(monkeypatch):
+    """Emulate a Western-European Windows on every platform: text-mode file I/O
+    that names no encoding gets cp1252, the ANSI code page there, instead of
+    UTF-8. Every pathlib read_text()/write_text() funnels through Path.open(),
+    so patching that one method covers them all; monkeypatch restores it."""
+    real_open = Path.open
+
+    def cp1252_open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if "b" not in mode and encoding is None:
+            encoding = "cp1252"
+        return real_open(self, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(Path, "open", cp1252_open)
+
+
+def test_vault_scan_and_excerpts_read_utf8_under_a_cp1252_default(
+    tmp_path, monkeypatch, cp1252_default
+):
+    """The reads named no encoding, so on Windows they decoded UTF-8 notes with
+    the ANSI code page: the CJK topic matched nothing, and every excerpt with a
+    non-ASCII character went onward as mojibake. The scan test above passes on
+    ubuntu with or without the fix; this one emulates the Windows default."""
+    _ensure_genai_stub()
+    from research import notebooklm, research_deep
+
+    vault = tmp_path / "vault"
+    (vault / "wiki").mkdir(parents=True)
+    note = vault / "wiki" / "morning.md"
+    note.write_bytes("---\ntype: note\n---\n\n朝ラボの習慣を記録する。習慣が大事。\n".encode("utf-8"))
+    for mod in (notebooklm, research_deep):
+        monkeypatch.setattr(mod, "VAULT_PATH", vault)
+        hits = mod.vault_scan("朝ラボの習慣")
+        assert [h["abs_path"] for h in hits] == [str(note)], mod.__name__
+    assert "習慣" in research_deep._excerpt(str(note))
+    assert "習慣" in research_deep.load_baseline(hits)
+
+
+class _Noon(datetime):
+    """datetime.now() frozen at one instant, so the daily-note filename a test
+    builds and the one append_to_daily() picks cannot straddle midnight."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 9, 2, 12, 0, 0)
+
+
+def test_vault_writes_are_utf8_under_a_cp1252_default(tmp_path, monkeypatch, cp1252_default):
+    """The writes named no encoding either, so on Windows the ANSI code page took
+    over: a research note carrying a character the page cannot encode (a CJK
+    word, on a Western-European system) failed to save (UnicodeEncodeError),
+    one carrying only characters it can encode (an accented letter) was saved
+    as code-page bytes that Obsidian reads as mojibake, and append_to_daily,
+    which rewrites the whole daily note, left it empty on the first kind
+    (write_text truncates before it encodes)."""
+    _ensure_genai_stub()
+    from research import notebooklm
+    from research.lib import vault
+
+    root = tmp_path / "vault"
+    root.mkdir()
+    monkeypatch.setattr(vault, "VAULT_PATH", root)
+    monkeypatch.setattr(vault, "datetime", _Noon)
+    monkeypatch.setattr(notebooklm, "NOTEBOOKLM_DIR", root / "Research" / "NotebookLM")
+    text = "caf\u00e9 \u7fd2\u6163"  # an accented Latin letter and a CJK word
+
+    note = vault.write_note("research", "朝ラボの習慣", {"type": "research", "tags": ["a"]}, text)
+    assert text in note.read_bytes().decode("utf-8")
+
+    vault.append_to_log(text)
+    assert text in (root / "log.md").read_bytes().decode("utf-8")
+
+    daily = root / "wiki" / "daily" / "2026-09-02.md"
+    daily.parent.mkdir(parents=True)
+    daily.write_bytes(f"# Daily\n\nAlready here: {text}\n".encode("utf-8"))
+    assert vault.append_to_daily(text) is True
+    daily_text = daily.read_bytes().decode("utf-8")
+    assert daily_text.startswith("# Daily") and daily_text.count(text) == 2
+
+    saved = notebooklm.save_note("朝ラボの習慣", "slug", "2026-09-02", "gemini", [{"path": "wiki/a.md"}], text)
+    assert text in saved.read_bytes().decode("utf-8")
+
+
+def test_append_to_daily_leaves_a_note_it_cannot_decode_alone(tmp_path, monkeypatch):
+    """A daily note an earlier Windows run rewrote in its code page is not UTF-8.
+    Reading it strictly would raise where the old code silently continued, and
+    reading it forgivingly would save U+FFFD over every such byte; the appender
+    declines instead and the bytes stay exactly as they were (note_io's rule)."""
+    from research.lib import vault
+
+    root = tmp_path / "vault"
+    monkeypatch.setattr(vault, "VAULT_PATH", root)
+    monkeypatch.setattr(vault, "datetime", _Noon)
+    daily = root / "wiki" / "daily" / "2026-09-02.md"
+    daily.parent.mkdir(parents=True)
+    legacy = "# Daily\n\ncaf\u00e9\n".encode("cp1252")
+    daily.write_bytes(legacy)
+    assert vault.append_to_daily("more") is False
+    assert daily.read_bytes() == legacy
+
+
+def test_append_to_log_leaves_a_log_it_cannot_decode_alone(tmp_path, monkeypatch):
+    """The same rule for log.md: UTF-8 appended to a log an earlier Windows run
+    wrote in its code page would leave bytes that decode as neither encoding,
+    so the appender declines and the file stays exactly as it was."""
+    from research.lib import vault
+
+    root = tmp_path / "vault"
+    root.mkdir()
+    monkeypatch.setattr(vault, "VAULT_PATH", root)
+    legacy = "\n## [2026-09-01] research-toolkit | caf\u00e9\n".encode("cp1252")
+    (root / "log.md").write_bytes(legacy)
+    assert vault.append_to_log("more") is False
+    assert (root / "log.md").read_bytes() == legacy
 
 
 def test_no_stale_tokenizer_copies_left_in_command_paths():

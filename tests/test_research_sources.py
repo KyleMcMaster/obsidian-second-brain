@@ -91,6 +91,29 @@ def test_cache_roundtrip(tmp_path, monkeypatch):
     assert cache.get("hackernews", "rust async", ttl_hours=0) is None
 
 
+@pytest.mark.parametrize("ttl_hours", [0, -1])
+def test_cache_zero_ttl_is_a_miss_without_consulting_the_clock(tmp_path, monkeypatch, ttl_hours):
+    """test_cache_roundtrip uses ttl_hours=0 to mean "expired", and get() decided
+    it with `age > 0`, an age computed from two clocks of different resolution:
+    right after a write it can be exactly zero or negative, so the entry came
+    back as fresh (on the Windows machine this surfaced on, time.time() moves
+    in 15.6 ms steps and the roundtrip failed in 1 of 8 runs). A TTL of zero or
+    less has to be decided without the clock at all, so here the clock raises."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    cache.put("hackernews", "rust async", [Result(source="hackernews", title="t", url="u", points=1)])
+    entry = cache._key("hackernews", "rust async")
+
+    def clock_must_not_be_read():
+        raise AssertionError("a TTL of zero or less must be decided without the clock")
+
+    monkeypatch.setattr(cache.time, "time", clock_must_not_be_read)
+    assert cache.get("hackernews", "rust async", ttl_hours=ttl_hours) is None
+    assert entry.exists()  # put() still writes; only the lookups miss
+    monkeypatch.setattr(cache.time, "time", lambda: entry.stat().st_mtime)  # the write's own instant
+    assert cache.get("hackernews", "rust async", ttl_hours=1) is not None  # positive TTLs unchanged
+
+
 class _FakeSource:
     def __init__(self, name, rows=None, raises=False):
         self.name = name
