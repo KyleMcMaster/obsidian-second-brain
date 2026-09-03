@@ -83,7 +83,10 @@ def is_excluded(parts, excludes: frozenset[str]) -> bool:
 # frontmatter into the exported body as prose and typed the note `note`.
 #
 # `\s*` after both fences is the permissive form the two scanners already used.
-FRONTMATTER_RE = re.compile(r"^---[ \t]*\n(.*?)\n---[ \t]*(?:\n|$)", re.DOTALL)
+# `\r?\n` on each fence: a note saved with CRLF line endings is frontmatter to
+# vault_health and vault_stats (their `\s*` absorbs the `\r`) and was none to
+# this pattern and to export_okf.FM_RE - the same disagreement, on line endings.
+FRONTMATTER_RE = re.compile(r"^---[ \t]*\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|$)", re.DOTALL)
 
 
 def split_frontmatter(text: str) -> tuple[str, str]:

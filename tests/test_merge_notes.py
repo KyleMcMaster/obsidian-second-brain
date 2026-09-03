@@ -16,6 +16,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -336,3 +337,43 @@ def test_same_stem_redirect_is_path_qualified(tmp_path):
         "--merged-body-file", str(body_file),
     )
     assert 'redirects_to: "[[Canonical]]"' in result.stdout
+
+
+@pytest.mark.parametrize(
+    "crlf_sides",
+    [("canonical", "retired"), ("canonical",), ("retired",)],
+    ids=["both", "canonical-only", "retired-only"],
+)
+def test_crlf_notes_keep_their_frontmatter_through_a_merge(tmp_path, crlf_sides):
+    """A note saved with CRLF line endings (a Windows editor; note_io preserves
+    them byte-exactly) parsed as having no frontmatter at all. With both notes
+    CRLF, --apply rewrote the canonical note with all of its original frontmatter
+    fields lost (only the alias the merge adds survived);
+    with one, that note's fields were silently missing from the merge (the
+    canonical note's own values replaced by the retired note's, or the retired
+    note's fields never unioned) and no conflict was reported. The fixtures
+    above hit the both-CRLF case on Windows, where write_text() saves them
+    with CRLF; this pins every case on every platform."""
+    vault = _vault(tmp_path)
+    for name, text in (("canonical", CANONICAL), ("retired", RETIRED)):
+        if name in crlf_sides:
+            text = text.replace("\n", "\r\n")
+        (vault / f"{name.capitalize()}.md").write_bytes(text.encode("utf-8"))
+    body_file = tmp_path / "body.md"
+    body_file.write_text(MERGED_BODY, encoding="utf-8")
+    result = _run(
+        "--path", str(vault),
+        "--canonical", "Canonical.md",
+        "--retire", "Retired.md",
+        "--merged-body-file", str(body_file),
+        "--apply",
+    )
+    assert result.returncode == 0, result.stderr
+    fm = yaml.safe_load((vault / "Canonical.md").read_text(encoding="utf-8").split("---")[1])
+    assert fm["type"] == "idea" and fm["ai-first"] is True
+    assert fm["status"] == "exploring"  # the canonical note's own value
+    assert str(fm["date"]) == "2026-01-01"
+    assert fm["tags"] == ["idea", "ai"]
+    assert fm["related-projects"] == ["[[Projects/Foo]]"]  # the retired note's field, unioned in
+    assert fm["merged_from"]["status"] == "captured"  # the retired note's value, recorded
+    assert "Retired" in fm["aliases"] and "Canon" in fm["aliases"]
