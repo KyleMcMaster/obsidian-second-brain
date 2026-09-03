@@ -77,6 +77,12 @@ def parse_note(text):
     not guess: the whole text rides along as body so no prose is dropped, and
     the type falls back to plain "note", never the folder name. A note with no
     frontmatter at all is NOT malformed - folder inference stays fair game."""
+    # A UTF-8 BOM ahead of the opening fence hid the whole block. The export
+    # reads with utf-8-sig, but merge_notes hands over note_io's byte-exact
+    # text, BOM included, and then carried the retired note's values into the
+    # canonical note as its own; skip it the way vault_scan.split_frontmatter does.
+    if text.startswith("\ufeff"):
+        text = text[1:]
     m = FM_RE.match(text)
     if not m:
         return {}, text, False

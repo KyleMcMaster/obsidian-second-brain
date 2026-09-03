@@ -11,6 +11,7 @@ resolving a pair from vault_health.check_duplicates() instead of a cached report
 
 from __future__ import annotations
 
+import codecs
 import subprocess
 import sys
 from datetime import date
@@ -377,3 +378,61 @@ def test_crlf_notes_keep_their_frontmatter_through_a_merge(tmp_path, crlf_sides)
     assert fm["related-projects"] == ["[[Projects/Foo]]"]  # the retired note's field, unioned in
     assert fm["merged_from"]["status"] == "captured"  # the retired note's value, recorded
     assert "Retired" in fm["aliases"] and "Canon" in fm["aliases"]
+
+
+def test_bom_notes_keep_their_frontmatter_through_a_merge(tmp_path):
+    """A UTF-8 BOM ahead of the opening fence (editors, mostly on Windows,
+    prepend one) hid the canonical note's whole frontmatter from parse_note:
+    the merge then reported no conflicts and carried the retired note's date
+    and status over as if they were the canonical note's own. note_io keeps
+    the BOM byte-exact on read, so the parser has to skip it, as
+    vault_scan.split_frontmatter already does; and the rewritten note keeps
+    the BOM it carried, since a byte an editor put there stays there."""
+    vault = _vault(tmp_path)
+    (vault / "Canonical.md").write_bytes(("\ufeff" + CANONICAL).encode("utf-8"))
+    (vault / "Retired.md").write_bytes(RETIRED.encode("utf-8"))
+    body_file = tmp_path / "body.md"
+    body_file.write_text(MERGED_BODY, encoding="utf-8")
+    result = _run(
+        "--path", str(vault),
+        "--canonical", "Canonical.md",
+        "--retire", "Retired.md",
+        "--merged-body-file", str(body_file),
+        "--apply",
+    )
+    assert result.returncode == 0, result.stderr
+    raw = (vault / "Canonical.md").read_bytes()
+    assert raw.startswith(codecs.BOM_UTF8), "the BOM the editor put there is gone"
+    fm = yaml.safe_load(raw.decode("utf-8-sig").split("---")[1])
+    assert fm["status"] == "exploring"  # the canonical note's own value, not the retired note's
+    assert str(fm["date"]) == "2026-01-01"
+    assert fm["merged_from"]["status"] == "captured"
+    assert "Canon" in fm["aliases"] and "Retired" in fm["aliases"]
+    assert not (vault / "Retired.md").read_bytes().startswith(codecs.BOM_UTF8)  # it had none
+
+
+def test_a_bom_on_the_retired_note_stays_on_its_redirect_stub(tmp_path):
+    """The complementary case: the retired note carried the BOM and the canonical
+    note did not. The redirect stub that replaces the retired note keeps that
+    BOM, the retired note's frontmatter is still read through it (its status
+    lands in merged_from), and the canonical note does not acquire one."""
+    vault = _vault(tmp_path)
+    (vault / "Canonical.md").write_bytes(CANONICAL.encode("utf-8"))
+    (vault / "Retired.md").write_bytes(("\ufeff" + RETIRED).encode("utf-8"))
+    body_file = tmp_path / "body.md"
+    body_file.write_text(MERGED_BODY, encoding="utf-8")
+    result = _run(
+        "--path", str(vault),
+        "--canonical", "Canonical.md",
+        "--retire", "Retired.md",
+        "--merged-body-file", str(body_file),
+        "--apply",
+    )
+    assert result.returncode == 0, result.stderr
+    stub = (vault / "Retired.md").read_bytes()
+    assert stub.startswith(codecs.BOM_UTF8), "the BOM the retired note carried is gone from its stub"
+    assert yaml.safe_load(stub.decode("utf-8-sig").split("---")[1])["type"] == "redirect"
+    canonical = (vault / "Canonical.md").read_bytes()
+    assert not canonical.startswith(codecs.BOM_UTF8)  # it had none
+    fm = yaml.safe_load(canonical.decode("utf-8").split("---")[1])
+    assert fm["merged_from"]["status"] == "captured"  # read through the retired note's BOM

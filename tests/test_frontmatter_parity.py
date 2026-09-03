@@ -85,6 +85,18 @@ def test_all_frontmatter_patterns_agree_on_a_crlf_note():
     assert fm_text.splitlines() == ["type: note", "tags: [a]"] and body == "\r\nbody\r\n"
 
 
+def test_parse_note_skips_a_bom_like_the_canonical_parser():
+    """export_okf reads with utf-8-sig, but merge_notes hands parse_note the
+    byte-exact text note_io returns, BOM included; the BOM then hid the whole
+    frontmatter and the merge carried the retired note's values over as the
+    canonical note's own (test_merge_notes pins the end-to-end case)."""
+    import export_okf
+
+    fm, body, malformed = export_okf.parse_note("\ufeff---\ntype: note\n---\n\nbody\n")
+    assert (fm, malformed) == ({"type": "note"}, False), "a BOM hid the frontmatter"
+    assert body == "\nbody\n"
+
+
 def test_the_canonical_parser_handles_the_awkward_cases():
     from vault_scan import split_frontmatter
 
