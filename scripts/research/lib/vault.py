@@ -58,7 +58,11 @@ def write_note(command: str, topic: str, frontmatter: dict[str, Any], body: str)
     fm_text = "\n".join(fm_lines)
 
     full = f"{fm_text}\n\n{body.strip()}\n"
-    path.write_text(full)
+    # UTF-8 by name, here and in the two appenders below: the platform default
+    # on Windows is the ANSI code page, where a note carrying a character the
+    # page cannot encode (a CJK word, on a Western-European system) failed to
+    # save and one it can encode was saved as bytes Obsidian reads as mojibake.
+    path.write_text(full, encoding="utf-8")
     return path
 
 
@@ -127,13 +131,24 @@ def print_save_links(note_path: Path, file=None) -> None:
             pass  # auto-open is a nice-to-have, never block the save flow
 
 
-def append_to_log(operation_summary: str) -> None:
-    """Append to the vault's log.md per _CLAUDE.md rules."""
+def append_to_log(operation_summary: str) -> bool:
+    """Append to the vault's log.md per _CLAUDE.md rules. Returns True if appended.
+
+    A log that is not UTF-8 (one an earlier Windows run wrote in its code page)
+    is left exactly as it is, as append_to_daily does: UTF-8 bytes appended to
+    it would leave a file that decodes correctly as neither encoding.
+    """
     log_path = VAULT_PATH / "log.md"
+    if log_path.exists():
+        try:
+            log_path.read_bytes().decode("utf-8")
+        except UnicodeDecodeError:
+            return False
     date = datetime.now().strftime("%Y-%m-%d")
     entry = f"\n## [{date}] research-toolkit | {operation_summary}\n"
-    with log_path.open("a") as f:
+    with log_path.open("a", encoding="utf-8") as f:
         f.write(entry)
+    return True
 
 
 def append_to_daily(summary_md: str) -> bool:
@@ -142,11 +157,16 @@ def append_to_daily(summary_md: str) -> bool:
     daily_path = VAULT_PATH / "wiki" / "daily" / f"{date}.md"
     if not daily_path.exists():
         return False
-    current = daily_path.read_text()
+    try:
+        current = daily_path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        # Not UTF-8 (a note an earlier Windows run rewrote in its code page):
+        # leave it as it is rather than rewrite it lossily, as note_io's rule says.
+        return False
     block = f"\n### Research - {datetime.now().strftime('%H:%M')}\n\n{summary_md.strip()}\n"
     if "## 🌙 Evening Review" in current:
         new = current.replace("## 🌙 Evening Review", f"{block}\n---\n\n## 🌙 Evening Review", 1)
     else:
         new = current + block
-    daily_path.write_text(new)
+    daily_path.write_text(new, encoding="utf-8")
     return True
