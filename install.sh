@@ -3,11 +3,24 @@
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="$HOME/.claude"
+# Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
+# Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
+# Code resolve ~ to there; HOME can point at another drive (a corporate roaming
+# home) and would split the config between the bash and Python halves.
+# Elsewhere HOME is the home. Uses bash 3.2 features only.
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*)
+    OSB_WIN=1
+    OSB_HOME="${USERPROFILE:-$HOME}"
+    OSB_HOME="$(cygpath -u "$OSB_HOME" 2>/dev/null || printf '%s' "${OSB_HOME//\\//}")" ;;
+  *) OSB_WIN=0; OSB_HOME="$HOME" ;;
+esac
+CLAUDE_DIR="$OSB_HOME/.claude"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
 SKILLS_DIR="$CLAUDE_DIR/skills"
-CONFIG_DIR="$HOME/.config/obsidian-second-brain"
-ENV_FILE="$CONFIG_DIR/.env"
+CONFIG_DIR="$OSB_HOME/.config/obsidian-second-brain"
+ENV_FILE="${OBSIDIAN_ENV_FILE:-$CONFIG_DIR/.env}"
+if [ "$OSB_WIN" = 1 ]; then ENV_FILE="${ENV_FILE//\\//}"; fi  # a native C:\... override must survive dirname
 
 echo "Installing obsidian-second-brain..."
 
@@ -57,7 +70,7 @@ else
   else
     echo "Symlink failed (requires Developer Mode). For the cleanest setup,"
     echo "clone the repo directly into the skills folder:"
-    echo "  git clone https://github.com/eugeniughelbur/obsidian-second-brain ~/.claude/skills/obsidian-second-brain"
+    echo "  git clone https://github.com/eugeniughelbur/obsidian-second-brain \"$SKILLS_DIR/obsidian-second-brain\""
     echo "Then re-run install.sh from that location."
   fi
 fi
@@ -71,8 +84,8 @@ if command -v python3 >/dev/null 2>&1; then
 elif command -v python >/dev/null 2>&1; then
   python "$SKILL_DIR/scripts/setup_settings_hook.py"
 else
-  echo "  python not found - add this SessionStart hook to ~/.claude/settings.json manually:"
-  echo "    python3 $HOME/.claude/skills/obsidian-second-brain/hooks/load_vault_context.py"
+  echo "  python not found - add this SessionStart hook to $CLAUDE_DIR/settings.json manually:"
+  echo "    python3 \"$SKILLS_DIR/obsidian-second-brain/hooks/load_vault_context.py\""
 fi
 
 # ── Research toolkit setup (optional) ──────────────────────────────
@@ -101,7 +114,7 @@ if [[ "$setup_research" =~ ^[Yy]$ ]]; then
   fi
 
   # Set up config dir + .env
-  mkdir -p "$CONFIG_DIR"
+  mkdir -p "$CONFIG_DIR" "$(dirname "$ENV_FILE")"
   if [ -f "$ENV_FILE" ]; then
     echo "  $ENV_FILE already exists - leaving it untouched."
   else

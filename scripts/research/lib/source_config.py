@@ -29,7 +29,10 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
-    _ENV_PATH = Path.home() / ".config" / "obsidian-second-brain" / ".env"
+    _ENV_PATH = Path(
+        os.environ.get("OBSIDIAN_ENV_FILE")
+        or (Path.home() / ".config" / "obsidian-second-brain" / ".env")
+    ).expanduser()
     load_dotenv(_ENV_PATH)
 except Exception:
     pass

@@ -55,6 +55,52 @@ emit_ai_first_warning() {
   exit 0
 }
 
+# Compare paths in one form: forward slashes and a lowercase drive letter (the
+# same normalization hooks/load_vault_context.py applies). On Windows, Claude
+# Code hands the hook tool_input.file_path with backslashes ("C:\Users\...")
+# while OBSIDIAN_VAULT_PATH may be written with forward slashes, in the MSYS
+# form (/c/Users/...), or as /cygdrive/c/..., so a plain prefix match never hit
+# and the hook was a silent no-op there. On Windows shells cygpath -m maps
+# every spelling to the mixed form (C:/Users/...) first; without cygpath the
+# backslash flip below still covers the form Claude Code produces. Uses bash
+# 3.2 features only (macOS ships 3.2).
+normalize_path() {
+  local p="$1"
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      # Each runtime misreads the other's drive spelling (MSYS takes
+      # /cygdrive/c/... as a directory under its own root, Cygwin does the
+      # same with /c/...), so both are mapped to the drive form by hand before
+      # cygpath sees them.
+      if [[ "$p" =~ ^/cygdrive/([A-Za-z])(/.*)?$ ]]; then
+        p="${BASH_REMATCH[1]}:${BASH_REMATCH[2]:-/}"
+      elif [[ "$p" =~ ^/([A-Za-z])(/.*)?$ ]]; then
+        p="${BASH_REMATCH[1]}:${BASH_REMATCH[2]:-/}"
+      fi
+      local mixed
+      if mixed=$(cygpath -m -- "$p" 2>/dev/null) && [[ -n "$mixed" ]]; then p="$mixed"; fi
+      p="${p//\\//}"
+      local drive
+      if [[ "$p" =~ ^([A-Za-z]):(.*)$ ]]; then
+        drive=$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]')
+        p="${drive}:${BASH_REMATCH[2]}"
+      fi ;;
+  esac
+  # Elsewhere the path is returned as given: a backslash is a legal character
+  # in a macOS or Linux filename and must stay one.
+  printf '%s' "$p"
+}
+
+# Comparison form of a normalized path: lowercase on Windows shells, where the
+# filesystem is case-insensitive and two spellings of one folder must match;
+# unchanged elsewhere. Only ever used for the comparison, never for I/O.
+path_key() {
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*) printf '%s' "$1" | tr '[:upper:]' '[:lower:]' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 INPUT=$(cat)
 
 # Write/Edit: tool_input.file_path. VS Code create_file: tool_input.filePath.
@@ -68,7 +114,11 @@ FILE=$(printf '%s' "$INPUT" | jq -r '
 
 # Bail silently on unparseable input or empty path
 [[ -z "$FILE" ]] && exit 0
-[[ "$FILE" == *.md ]] || exit 0
+FILE=$(normalize_path "$FILE")
+# Classification (the .md gate, the vault scope, the excluded folders) uses the
+# comparison form; FILE itself stays the real path for reading the note.
+FILE_KEY=$(path_key "$FILE")
+[[ "$FILE_KEY" == *.md ]] || exit 0
 [[ -f "$FILE" ]] || exit 0
 
 # Only validate inside the configured vault. Environment wins; fall back to the
@@ -79,43 +129,76 @@ FILE=$(printf '%s' "$INPUT" | jq -r '
 # path, swept when the hook turned out never to have been wired at all.
 VAULT="${OBSIDIAN_VAULT_PATH:-}"
 if [[ -z "$VAULT" ]]; then
-  ENV_FILE="${OBSIDIAN_ENV_FILE:-$HOME/.config/obsidian-second-brain/.env}"
+  # Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
+  # Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
+  # Code resolve ~ to there; HOME can point at another drive (a corporate roaming
+  # home) and would split the config between the bash and Python halves.
+  # Elsewhere HOME is the home. Uses bash 3.2 features only.
+  case "$(uname -s 2>/dev/null)" in
+    MINGW*|MSYS*|CYGWIN*)
+      OSB_WIN=1
+      OSB_HOME="${USERPROFILE:-$HOME}"
+      OSB_HOME="$(cygpath -u "$OSB_HOME" 2>/dev/null || printf '%s' "${OSB_HOME//\\//}")" ;;
+    *) OSB_WIN=0; OSB_HOME="$HOME" ;;
+  esac
+  ENV_FILE="${OBSIDIAN_ENV_FILE:-$OSB_HOME/.config/obsidian-second-brain/.env}"
+  if [[ "$OSB_WIN" = 1 ]]; then ENV_FILE="${ENV_FILE//\\//}"; fi
   if [[ -r "$ENV_FILE" ]]; then
     VAULT=$(sed -n 's/^[[:space:]]*OBSIDIAN_VAULT_PATH[[:space:]]*=[[:space:]]*//p' "$ENV_FILE" \
-      | tail -n 1 | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
+      | tail -n 1 | tr -d '\r' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
   fi
 fi
 [[ -z "$VAULT" ]] && exit 0
+VAULT=$(normalize_path "$VAULT")
 VAULT="${VAULT%/}"
-case "$FILE" in
-  "$VAULT"/*) ;;
+VAULT_KEY=$(path_key "$VAULT")
+case "$FILE_KEY" in
+  "$VAULT_KEY"/*) ;;
   *) exit 0 ;;
 esac
 
-# Skip non-first-class paths
-case "$FILE" in
+# Skip non-first-class paths. On Windows shells the match is case-insensitive
+# (nocasematch, bash 3.1+), as the filesystem is, so the mixed-case entries
+# below keep matching the lowercased key; elsewhere the case is exact.
+case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) shopt -s nocasematch ;; esac
+case "$FILE_KEY" in
   */raw/*|*/templates/*|*/_export/*|*/.obsidian/*|*/.git/*|*/.trash/*|*/boards/*|*/Boards/*|*/Logs/*|*/_CLAUDE.md|*/Home.md|*/index.md|*/log.md|*/catchup.md)
     exit 0 ;;
 esac
+shopt -u nocasematch
 
 BASENAME=$(basename "$FILE")
 WARNINGS=()
 
+# A note saved with CRLF line endings (a Windows editor, git autocrlf) would fail
+# every delimiter check below, because each line carries a trailing carriage
+# return; the checks read a CR-free copy instead. BASENAME and the warnings
+# still name the real file.
+READ_FILE="$FILE"
+if grep -q $'\r' "$FILE" 2>/dev/null; then
+  CR_FREE=$(mktemp "${TMPDIR:-/tmp}/ai-first.XXXXXX" 2>/dev/null) || exit 0
+  trap 'rm -f "$CR_FREE"' EXIT
+  # A copy that failed halfway is not worth validating: silence beats a false
+  # warning raised against the original.
+  tr -d '\r' < "$FILE" > "$CR_FREE" || exit 0
+  READ_FILE="$CR_FREE"
+fi
+
 # ── Check 1: frontmatter delimiters ──────────────────────────────────────────
-FIRST_LINE=$(head -1 "$FILE")
+FIRST_LINE=$(head -1 "$READ_FILE")
 if [[ "$FIRST_LINE" != "---" ]]; then
   # Without frontmatter we can't run the other checks meaningfully - surface
   # this single warning and exit.
   emit_ai_first_warning "AI-first warning: $BASENAME has no frontmatter (expected --- on the first line). AI-first notes need date/type/tags/ai-first metadata."
 fi
 
-DELIMITER_COUNT=$(grep -c '^---$' "$FILE")
+DELIMITER_COUNT=$(grep -c '^---$' "$READ_FILE")
 if [[ "$DELIMITER_COUNT" -lt 2 ]]; then
   WARNINGS+=("$BASENAME frontmatter is missing the closing --- delimiter.")
 fi
 
 # Extract frontmatter content (between the first and second --- lines)
-FRONTMATTER=$(awk '/^---$/{c++; if (c==1) next; if (c==2) exit} c==1' "$FILE")
+FRONTMATTER=$(awk '/^---$/{c++; if (c==1) next; if (c==2) exit} c==1' "$READ_FILE")
 
 # ── Check 2: tabs in frontmatter ─────────────────────────────────────────────
 TAB_CHAR=$'\t'
@@ -138,13 +221,17 @@ if ! printf '%s\n' "$FRONTMATTER" | grep -qE '^ai-first:[[:space:]]*true[[:space
 fi
 
 # ── Check 4: 'For future agent' preamble in body ────────────────────────────
-BODY=$(awk '/^---$/{c++; if (c<2) next; next} c>=2' "$FILE")
+BODY=$(awk '/^---$/{c++; if (c<2) next; next} c>=2' "$READ_FILE")
 if ! printf '%s\n' "$BODY" | grep -qE '^##[[:space:]]+For future (agent|AI|Claude|Codex)[[:space:]]*$' ; then
   WARNINGS+=("$BASENAME missing '## For future agent' preamble (required by ai-first-rules.md rule #2).")
 fi
 
 # ── Check 5: non-ASCII substitution characters ───────────────────────────────
 if command -v python3 >/dev/null 2>&1; then
+  # The Python scans read the real file: Python's text mode handles CRLF on its
+  # own, and the mktemp path is a shell path (/tmp/...) that a native Windows
+  # Python cannot open when the shell does not convert arguments, which would
+  # have silently disabled these two checks.
   NON_ASCII_HITS=$(python3 - "$FILE" <<'PYEOF'
 import sys
 
@@ -213,7 +300,7 @@ try:
         for lineno, line in enumerate(fh, 1):
             for pat, label in PATTERNS:
                 if pat.search(line):
-                    print(f"    line {lineno}: looks like a {label} - secrets never belong in vault notes; keep them in ~/.config/obsidian-second-brain/.env or a password manager and reference them by NAME only")
+                    print(f"    line {lineno}: looks like a {label} - secrets never belong in vault notes; keep them in the toolkit's config file (OBSIDIAN_ENV_FILE, or the platform default the README documents) or a password manager and reference them by NAME only")
                     break
 except OSError:
     pass

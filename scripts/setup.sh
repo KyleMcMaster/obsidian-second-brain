@@ -15,10 +15,23 @@
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SETTINGS="$HOME/.claude/settings.json"
+# Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
+# Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
+# Code resolve ~ to there; HOME can point at another drive (a corporate roaming
+# home) and would split the config between the bash and Python halves.
+# Elsewhere HOME is the home. Uses bash 3.2 features only.
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*)
+    OSB_WIN=1
+    OSB_HOME="${USERPROFILE:-$HOME}"
+    OSB_HOME="$(cygpath -u "$OSB_HOME" 2>/dev/null || printf '%s' "${OSB_HOME//\\//}")" ;;
+  *) OSB_WIN=0; OSB_HOME="$HOME" ;;
+esac
+SETTINGS="$OSB_HOME/.claude/settings.json"
 HOOK_SCRIPT="$SKILL_DIR/hooks/obsidian-bg-agent.sh"
 SESSION_HOOK="$SKILL_DIR/hooks/load_vault_context.py"
-ENV_FILE="$HOME/.config/obsidian-second-brain/.env"
+ENV_FILE="${OBSIDIAN_ENV_FILE:-$OSB_HOME/.config/obsidian-second-brain/.env}"
+if [[ "$OSB_WIN" = 1 ]]; then ENV_FILE="${ENV_FILE//\\//}"; fi
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +41,7 @@ red()    { printf '\033[0;31m%s\033[0m\n' "$1"; }
 step()   { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
 if ! command -v jq >/dev/null 2>&1; then
-  red "Error: jq is required (it edits ~/.claude/settings.json safely)."
+  red "Error: jq is required (it edits $SETTINGS safely)."
   echo "Install it: brew install jq   |   sudo apt install jq   |   https://jqlang.github.io/jq/"
   exit 1
 fi
@@ -70,7 +83,7 @@ green "   Done - $SESSION_HOOK"
 
 # ── ensure settings.json exists ───────────────────────────────────────────────
 
-step "2. Updating ~/.claude/settings.json..."
+step "2. Updating $SETTINGS..."
 
 if [[ ! -f "$SETTINGS" ]]; then
   echo "{}" > "$SETTINGS"
@@ -166,10 +179,10 @@ fi
 
 # ── register slash commands ──────────────────────────────────────────────────
 
-step "3. Registering slash commands in ~/.claude/commands/..."
+step "3. Registering slash commands in $OSB_HOME/.claude/commands/..."
 
 COMMANDS_SRC="$SKILL_DIR/commands"
-COMMANDS_DST="$HOME/.claude/commands"
+COMMANDS_DST="$OSB_HOME/.claude/commands"
 
 if [[ ! -d "$COMMANDS_SRC" ]]; then
   yellow "   No commands/ directory in skill - skipping"

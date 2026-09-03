@@ -9,7 +9,19 @@
 #   4. Prints the two follow-up choices: wire an existing vault, or bootstrap a new one
 set -euo pipefail
 
-SKILL_HOME="$HOME/.claude/skills/obsidian-second-brain"
+# Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
+# Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
+# Code resolve ~ to there; HOME can point at another drive (a corporate roaming
+# home) and would split the config between the bash and Python halves.
+# Elsewhere HOME is the home. Uses bash 3.2 features only.
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*)
+    OSB_WIN=1
+    OSB_HOME="${USERPROFILE:-$HOME}"
+    OSB_HOME="$(cygpath -u "$OSB_HOME" 2>/dev/null || printf '%s' "${OSB_HOME//\\//}")" ;;
+  *) OSB_WIN=0; OSB_HOME="$HOME" ;;
+esac
+SKILL_HOME="$OSB_HOME/.claude/skills/obsidian-second-brain"
 REPO_URL="https://github.com/eugeniughelbur/obsidian-second-brain"
 
 command -v git >/dev/null 2>&1 || { echo "Error: git is required. Install git and re-run." >&2; exit 1; }

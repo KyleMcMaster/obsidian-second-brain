@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -53,7 +54,10 @@ except (Exception, SystemExit):  # pragma: no cover - fall back to a bare dotenv
     try:
         from dotenv import load_dotenv
 
-        load_dotenv(Path.home() / ".config" / "obsidian-second-brain" / ".env")
+        load_dotenv(Path(
+            os.environ.get("OBSIDIAN_ENV_FILE")
+            or (Path.home() / ".config" / "obsidian-second-brain" / ".env")
+        ).expanduser())
     except Exception:
         pass
 
@@ -200,6 +204,44 @@ def _rank_of_gold(results: list[dict[str, Any]], gold: list[str]) -> int:
     return 0
 
 
+def _split_external_cmd(cmd: str) -> list[str]:
+    r"""Split RETRIEVAL_EVAL_EXTERNAL_CMD into argv.
+
+    Two forms. A JSON array (the value starts with "[") is the exact form: each
+    element is one argument and no shell quoting rules apply, only JSON's own
+    (a double quote inside a string is \", a backslash is \\, or write Windows
+    paths with forward slashes), so spaces, embedded quotes and empty arguments
+    pass through exactly:
+        ["bash", "C:/Program Files/x/engine.sh", "--out", "say \"hi\""]
+    A plain string is split with shell-like rules: POSIX shlex on macOS and
+    Linux; on Windows, where POSIX shlex would treat every backslash as an escape
+    and eat the separators of a path, non-POSIX splitting that keeps backslashes
+    and removes one layer of matching surrounding quotes per token. The plain
+    form covers a command plus simple arguments; anything with escaped quotes or
+    quotes inside an argument belongs in the JSON form.
+    """
+    import json
+    import shlex
+
+    stripped = cmd.strip()
+    if stripped.startswith("["):
+        try:
+            parts = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"RETRIEVAL_EVAL_EXTERNAL_CMD looks like a JSON array but does not parse: {exc}")
+        if not isinstance(parts, list) or not parts or not all(isinstance(p, str) for p in parts):
+            raise SystemExit("RETRIEVAL_EVAL_EXTERNAL_CMD as JSON must be a non-empty array of strings")
+        return parts
+    if os.name != "nt":
+        return shlex.split(cmd)
+    parts: list[str] = []
+    for token in shlex.split(cmd, posix=False):
+        if len(token) >= 2 and token[0] == token[-1] and token[0] in ("'", '"'):
+            token = token[1:-1]
+        parts.append(token)
+    return parts
+
+
 def _searcher(mode: str):
     """Return a (label, fn(query)->results) for the chosen retrieval mode.
 
@@ -227,19 +269,22 @@ def _searcher(mode: str):
         # the shipped search without being imported or vendored (pattern from
         # the structured-rag eval fork, fork-insights round 2).
         import os
-        import shlex
         import subprocess
         cmd = os.environ.get("RETRIEVAL_EVAL_EXTERNAL_CMD", "").strip()
         if not cmd:
             raise SystemExit(
                 "External mode needs RETRIEVAL_EVAL_EXTERNAL_CMD - a command that "
                 "takes the query as its final argument and prints ranked note "
-                "paths (JSON array or one per line)."
+                "paths (JSON array or one per line). The value is a plain command "
+                "line, or a JSON array of arguments for anything shell quoting "
+                "cannot express."
             )
+
+        parts = _split_external_cmd(cmd)
 
         def _external(q: str) -> list[dict[str, Any]]:
             proc = subprocess.run(
-                shlex.split(cmd) + [q],
+                parts + [q],
                 capture_output=True, text=True, timeout=120,
             )
             if proc.returncode != 0:
@@ -331,6 +376,12 @@ def evaluate(cases_path: Path, as_json: bool, mode: str = "lexical") -> int:
     }
 
     if as_json:
+        # Force UTF-8 stdout: on Windows a pipe defaults to cp1252, which cannot
+        # encode every character a case question or note path may carry.
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
         print(json.dumps({"summary": summary, "cases": per_case}, ensure_ascii=False, indent=2))
         return 0
 

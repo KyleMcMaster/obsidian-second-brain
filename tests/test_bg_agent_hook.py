@@ -29,7 +29,7 @@ def _run_hook(stdin: str, env_extra: dict, tmp_path: Path) -> subprocess.Complet
     # summary now arrives on stdin rather than in "$@".
     stub.write_text(
         "#!/usr/bin/env bash\n"
-        f'{{ echo "CWD=$PWD"; printf \'ARG=%s\\n\' "$@"; echo "STDIN<<<"; cat; }} > "{record}"\n',
+        f'{{ echo "CWD=$(pwd -W 2>/dev/null || pwd)"; printf \'ARG=%s\\n\' "$@"; echo "STDIN<<<"; cat; }} > "{record}"\n',
         encoding="utf-8",
     )
     stub.chmod(0o755)
@@ -82,7 +82,9 @@ def test_full_chain_spawns_agent_with_summary(tmp_path):
             break
         time.sleep(0.1)
     body = record.read_text(encoding="utf-8")
-    assert f"CWD={vault}" in body, "agent must run inside the vault"
+    # The stub prints `pwd -W` on Git Bash (Windows form, forward slashes) and
+    # plain `pwd` elsewhere; as_posix() is the same string on both.
+    assert f"CWD={vault.as_posix()}" in body, "agent must run inside the vault"
     assert "ARG=--dangerously-skip-permissions" in body
     assert "SUMMARY-SENTINEL" in body, "the compact summary must reach the prompt"
     assert "met a new person" in body, "multi-line summaries must survive the base64 hop"

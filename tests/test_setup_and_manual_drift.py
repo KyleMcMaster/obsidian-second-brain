@@ -18,6 +18,7 @@ not diff prose - that would be noise - it pins the specific facts that drifted.
 
 from __future__ import annotations
 
+import os
 import re
 import stat
 import subprocess
@@ -52,8 +53,9 @@ def test_setup_preserves_the_env_file_mode(tmp_path):
          '&& mv "$1.tmp" "$1" && chmod 600 "$1"', "_", str(env)],
         check=True, capture_output=True,
     )
-    mode = stat.S_IMODE(env.stat().st_mode)
-    assert mode == 0o600, f"the API-key file ended at {oct(mode)}, readable by others"
+    if os.name != "nt":  # Windows keeps no POSIX owner/group distinction; the umask/chmod pipeline cannot be verified through st_mode there
+        mode = stat.S_IMODE(env.stat().st_mode)
+        assert mode == 0o600, f"the API-key file ended at {oct(mode)}, readable by others"
 
 
 def test_install_creates_the_env_file_restricted():
@@ -116,3 +118,13 @@ def test_skill_md_command_count_matches_reality():
     assert not wrong, (
         f"SKILL.md claims {sorted(wrong)} commands; commands/ holds {actual}"
     )
+
+
+def test_installers_honor_the_env_file_override():
+    """OBSIDIAN_ENV_FILE relocates the config for every reader; the two scripts
+    that write the file must write it to the same place, or setting the override
+    recreates the split configuration it exists to remove."""
+    for rel in ("install.sh", "scripts/setup.sh"):
+        script = (REPO_ROOT / rel).read_text(encoding="utf-8")
+        assert 'ENV_FILE="${OBSIDIAN_ENV_FILE:-' in script, f"{rel} must derive ENV_FILE from OBSIDIAN_ENV_FILE"
+        assert 'ENV_FILE="${ENV_FILE//' in script, f"{rel} must accept a native backslash path in OBSIDIAN_ENV_FILE"

@@ -410,6 +410,13 @@ def main(argv: list[str]) -> int:
         return 2
     graph = build_graph(vault, args.scope)
     out = lint_graph(graph) if args.lint else graph
+    # Force UTF-8 stdout. On Windows a pipe defaults to cp1252, and a decomposed
+    # title (u + U+0308, the macOS filename form) has no cp1252 form, so the
+    # ensure_ascii=False dump below raised UnicodeEncodeError there.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
     print(json.dumps(out, ensure_ascii=False, indent=2))
     return 0
 
