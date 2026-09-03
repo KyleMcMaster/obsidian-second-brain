@@ -16,8 +16,8 @@ Each test corresponds to a defect that was actually present:
 
 from __future__ import annotations
 
-import os
 import importlib
+import os
 import sys
 from pathlib import Path
 

@@ -32,9 +32,9 @@ XAI_API_KEY optional (enables the LLM question generator).
 
 from __future__ import annotations
 
-import os
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
