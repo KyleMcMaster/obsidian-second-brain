@@ -77,6 +77,44 @@ def test_vault_scan_finds_cjk_topic(tmp_path, monkeypatch):
         assert not any("unrelated.md" in p for p in paths), (mod.__name__, paths)
 
 
+@pytest.fixture
+def cp1252_default(monkeypatch):
+    """Emulate a Western-European Windows on every platform: text-mode file I/O
+    that names no encoding gets cp1252, the ANSI code page there, instead of
+    UTF-8. Every pathlib read_text()/write_text() funnels through Path.open(),
+    so patching that one method covers them all; monkeypatch restores it."""
+    real_open = Path.open
+
+    def cp1252_open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
+        if "b" not in mode and encoding is None:
+            encoding = "cp1252"
+        return real_open(self, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(Path, "open", cp1252_open)
+
+
+def test_vault_scan_and_excerpts_read_utf8_under_a_cp1252_default(
+    tmp_path, monkeypatch, cp1252_default
+):
+    """The reads named no encoding, so on Windows they decoded UTF-8 notes with
+    the ANSI code page: the CJK topic matched nothing, and every excerpt with a
+    non-ASCII character went onward as mojibake. The scan test above passes on
+    ubuntu with or without the fix; this one emulates the Windows default."""
+    _ensure_genai_stub()
+    from research import notebooklm, research_deep
+
+    vault = tmp_path / "vault"
+    (vault / "wiki").mkdir(parents=True)
+    note = vault / "wiki" / "morning.md"
+    note.write_bytes("---\ntype: note\n---\n\n朝ラボの習慣を記録する。習慣が大事。\n".encode("utf-8"))
+    for mod in (notebooklm, research_deep):
+        monkeypatch.setattr(mod, "VAULT_PATH", vault)
+        hits = mod.vault_scan("朝ラボの習慣")
+        assert [h["abs_path"] for h in hits] == [str(note)], mod.__name__
+    assert "習慣" in research_deep._excerpt(str(note))
+    assert "習慣" in research_deep.load_baseline(hits)
+
+
 def test_no_stale_tokenizer_copies_left_in_command_paths():
     """The private copy survived #159, #188 and #192 because nothing fenced it.
     Command-path scripts must not re-grow a whitespace-split + len filter;

@@ -61,7 +61,11 @@ def vault_scan(topic: str) -> list[dict]:
             if "Research/NotebookLM/" in str(path):
                 continue
             try:
-                text = path.read_text(errors="ignore").lower()
+                # encoding named: vault notes are UTF-8 (Obsidian writes them so)
+                # and the platform default on Windows is the ANSI code page
+                # (cp1252 on a Western-European system), where a CJK topic then
+                # matched nothing.
+                text = path.read_text(encoding="utf-8", errors="ignore").lower()
             except OSError:
                 continue
             score = sum(text.count(k) for k in keywords)
