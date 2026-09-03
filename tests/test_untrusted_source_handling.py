@@ -62,6 +62,34 @@ def test_ingest_warns_before_the_step_that_rewrites_user_notes():
     assert "ai-first-rules.md" in window, "the step does not point at the canonical rule"
 
 
+def test_ingest_treats_rewrites_of_existing_notes_as_proposals():
+    """#239: the confirm-before-rewrite rule in ai-first-rules.md never reached
+    /obsidian-ingest. Step 6 mandated rewriting existing notes and the #218
+    same-hash re-read routed straight into it, so a re-ingest rewrote a daily
+    note, Home.md, entity and idea notes and log.md with no question asked; and
+    content_hash was defined over the raw capture, so a JS-rendered page hashed
+    differently on every fetch and the branch table had no row for "hash
+    differs, content identical"."""
+    text = (REPO_ROOT / "commands" / "obsidian-ingest.md").read_text(encoding="utf-8")
+    rewrite_at = text.index("REWRITE the vault")
+    window = text[rewrite_at:rewrite_at + 3000].lower()
+    assert "proposal" in window and "confirm" in window, (
+        "step 6 rewrites existing notes with no confirmation step"
+    )
+    same_hash = text[text.index("Same hash found"):text.index("Neither found")]
+    assert "confirm" in same_hash.lower(), (
+        "a same-hash re-read may rewrite existing notes without the user's yes"
+    )
+    hash_spec = text[text.index("content_hash"):text.index("Same hash found")].lower()
+    assert "canonical" in hash_spec, (
+        "content_hash is defined over the raw capture, so a JS-rendered page hashes "
+        "differently on every fetch"
+    )
+    assert "Same URL, different hash" in text and "capture noise" in text, (
+        "no branch for a hash that differs while the article text is unchanged"
+    )
+
+
 def test_research_deep_treats_synthesis_bullets_as_proposals():
     """The synthesis is model output over fetched pages, not the user speaking."""
     script = (REPO_ROOT / "scripts" / "research" / "research_deep.py").read_text(encoding="utf-8")

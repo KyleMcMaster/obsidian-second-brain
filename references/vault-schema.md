@@ -186,7 +186,7 @@ tags:
   - source
 source_type: article   # article | transcript | pdf | video
 source_url: "https://..."
-content_hash: ""       # for drift detection
+content_hash: ""       # first 16 hex of SHA-256 over the canonical text (see /obsidian-ingest step 5); drift detection
 ---
 ```
 

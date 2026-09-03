@@ -83,11 +83,17 @@ def cp1252_default(monkeypatch):
     """Emulate a Western-European Windows on every platform: text-mode file I/O
     that names no encoding gets cp1252, the ANSI code page there, instead of
     UTF-8. Every pathlib read_text()/write_text() funnels through Path.open(),
-    so patching that one method covers them all; monkeypatch restores it."""
+    so patching that one method covers them all; monkeypatch restores it.
+
+    read_text()/write_text() do not pass None through: since 3.10 they resolve
+    it to the string "locale" (io.text_encoding) before calling open(), so a
+    guard on `is None` alone intercepts a direct Path.open("a") and misses
+    every read_text()/write_text() - which let the two tests below pass with
+    or without the fix on the CI runner (found in the #248 review)."""
     real_open = Path.open
 
     def cp1252_open(self, mode="r", buffering=-1, encoding=None, errors=None, newline=None):
-        if "b" not in mode and encoding is None:
+        if "b" not in mode and encoding in (None, "locale"):
             encoding = "cp1252"
         return real_open(self, mode, buffering, encoding, errors, newline)
 

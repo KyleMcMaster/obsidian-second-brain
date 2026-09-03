@@ -1521,15 +1521,20 @@ def test_research_config_honors_env_file_override(tmp_path):
     assert out == ["pplx-from-the-environment"], "a variable set in the environment must not be overridden by the file"
 
 
-def test_retrieval_eval_external_cmd_splitting(tmp_path):
+@pytest.mark.parametrize("os_name", ["nt", "posix"])
+def test_retrieval_eval_external_cmd_splitting(tmp_path, os_name):
     """RETRIEVAL_EVAL_EXTERNAL_CMD must survive Windows paths. POSIX shlex eats
     the backslashes of a Windows path, and blindly doubling them would corrupt a
     quoted literal such as '\\d+'; on Windows the command is split in non-POSIX
     mode with one layer of surrounding quotes removed, elsewhere POSIX rules
-    apply unchanged. Exercised through the real function in a subprocess."""
+    apply unchanged. Exercised through the real function in a subprocess, once
+    per branch: the function keys on the os.name string alone, so the subprocess
+    sets it and the ubuntu CI runner covers the Windows split as well (the first
+    version gated the Windows cases on the runner's own os.name, so CI never ran
+    them; found in the #243 review)."""
     script = REPO_ROOT / "scripts/eval/retrieval_eval.py"
     bs = "\\"
-    if os.name == "nt":
+    if os_name == "nt":
         plain = bs.join(["C:", "Users", "me", "engine.sh"])
         spaced = bs.join(["C:", "Program Files", "x", "engine.sh"])
         unc = bs + bs + bs.join(["server", "share", "engine.exe"])
@@ -1556,15 +1561,113 @@ def test_retrieval_eval_external_cmd_splitting(tmp_path):
         "import importlib.util, json, sys; "
         f"spec = importlib.util.spec_from_file_location('retrieval_eval', {str(script)!r}); "
         "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); "
+        # Set after the imports: pathlib and friends pick their flavour at import time.
+        "import os; os.name = sys.argv[2]; "
         "print(json.dumps([m._split_external_cmd(c) for c in json.loads(sys.argv[1])]))"
     )
     r = subprocess.run(
-        [sys.executable, "-c", code, json.dumps(list(cases))],
+        [sys.executable, "-c", code, json.dumps(list(cases)), os_name],
         cwd=REPO_ROOT, env=dict(os.environ, OBSIDIAN_VAULT_PATH=str(tmp_path)),
         capture_output=True, text=True, encoding="utf-8",
     )
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout.strip().splitlines()[-1]) == list(cases.values())
+
+
+def test_validate_hook_accepts_the_callout_preamble(tmp_path):
+    """Rule 2 accepts the Obsidian callout form of the preamble as well as the
+    heading (#237): `> [!info]- For future agent` is plain text, needs no
+    plugin, and folds so a human sees the note content first. The hook used to
+    match the heading only, so every such note raised a false warning on every
+    write. A bold line or a paragraph without the title is still not a preamble."""
+    hook = REPO_ROOT / "hooks/validate-ai-first.sh"
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    fm = "---\ntype: note\ndate: 2026-09-04\ntags: [t]\nai-first: true\n---\n\n"
+
+    def run(name, body):
+        note = vault / name
+        note.write_text(fm + body, encoding="utf-8")
+        return subprocess.run(
+            ["bash", str(hook)],
+            input=json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(note)}}),
+            env=dict(os.environ, OBSIDIAN_VAULT_PATH=str(vault)),
+            capture_output=True, text=True,
+        )
+
+    for body in (
+        "> [!info]- For future agent\n> A folded callout preamble, two sentences long.\n\nBody.\n",
+        "> [!note]+ For future agent\n> An expanded callout of another type.\n",
+        ">[!abstract] For future Claude\n> Legacy label, still valid.\n",
+        "## For future agent\nThe heading form keeps working.\n",
+    ):
+        r = run("ok.md", body)
+        assert r.returncode == 0, r.stderr
+        assert r.stdout == "", f"a valid preamble must be silent, got: {r.stdout[:200]}"
+
+    for body in (
+        "**For future agent**\nBold is not a preamble.\n",
+        "For future agent: a bare paragraph is not one either.\n",
+        "> A callout without the title.\n",
+    ):
+        r = run("bad.md", body)
+        assert r.returncode == 0, r.stderr
+        assert "preamble" in json.loads(r.stdout)["systemMessage"], body
+
+
+def test_validate_hook_is_loud_when_the_payload_has_no_known_path_key(tmp_path):
+    """The matcher fired, so a write happened; a payload whose path sits under a
+    key the hook does not read (a new editor, a renamed field) used to exit 0,
+    indistinguishable from "not a vault file", and the write went unchecked
+    (#171). Now: one stderr line naming the tool and the keys, exit 1, still
+    non-blocking. Input with no tool_name stays silent, and a NotebookEdit
+    payload is read through notebook_path and dropped by the .md gate."""
+    hook = REPO_ROOT / "hooks/validate-ai-first.sh"
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    bad = vault / "bad.md"
+    bad.write_text("# no frontmatter\n", encoding="utf-8")
+    env = dict(os.environ, OBSIDIAN_VAULT_PATH=str(vault))
+
+    def run(payload):
+        return subprocess.run(
+            ["bash", str(hook)], input=json.dumps(payload), env=env,
+            capture_output=True, text=True,
+        )
+
+    r = run({"tool_name": "create_file", "tool_input": {"path": str(bad)}})
+    assert r.returncode == 1
+    assert r.stdout == ""
+    assert "found no file path" in r.stderr and "create_file" in r.stderr and "path" in r.stderr
+    assert "NOT validated" in r.stderr
+
+    r = run({"tool_input": {"path": str(bad)}})  # no tool_name: nothing fired
+    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
+
+    r = run({"tool_name": "NotebookEdit", "tool_input": {"notebook_path": str(vault / "n.ipynb")}})
+    assert r.returncode == 0 and r.stdout == "" and r.stderr == ""
+
+    r = run({"tool_name": "Write", "tool_input": {"file_path": str(bad)}})  # the known shape still warns
+    assert r.returncode == 0
+    assert "frontmatter" in json.loads(r.stdout)["systemMessage"]
+
+
+def test_mcp_validate_note_accepts_the_callout_preamble(tmp_path, monkeypatch):
+    """The MCP validator and the hook must agree on rule 2 (#237)."""
+    vault_ops = _load_vault_ops()
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    monkeypatch.setenv("OBSIDIAN_VAULT_PATH", str(vault))
+    fm = "---\ntype: note\ndate: 2026-09-04\ntags:\n  - x\nai-first: true\n---\n\n"
+    (vault / "Callout.md").write_text(
+        fm + "> [!info]- For future agent\n> A folded callout preamble.\n\nBody.\n", encoding="utf-8"
+    )
+    (vault / "Empty.md").write_text(fm + "> [!info]- For future agent\n>\n\n## Body\n", encoding="utf-8")
+    (vault / "Bold.md").write_text(fm + "**For future agent**\nNot a preamble.\n", encoding="utf-8")
+
+    assert vault_ops.validate_note("Callout.md")["ok"] is True
+    assert "future-agent preamble is empty" in vault_ops.validate_note("Empty.md")["issues"]
+    assert any("preamble" in i for i in vault_ops.validate_note("Bold.md")["issues"])
 
 
 def test_recall_hook_contract(tmp_path):

@@ -270,8 +270,13 @@ _READ_CAP = 20_000
 # memory, so changing the preferred label must not make years of Claude-authored
 # notes fail validation when Codex, Gemini, Hermes, or another agent reads them.
 _PREAMBLE_HEADING = "For future agent"
+# Two accepted spellings (ai-first-rules.md rule 2): the heading every command
+# writes, and the Obsidian callout form `> [!info]- For future agent` (any
+# callout type, folded or not) a vault may prefer so a human sees the note
+# content first (#237). The write-time hook and vault_health match the same two.
 _PREAMBLE_RE = re.compile(
-    r"(?mi)^##[ \t]+For future (?:agent|AI|Claude|Codex)[ \t]*$"
+    r"(?mi)^(?:##[ \t]+|>[ \t]*\[![A-Za-z][\w-]*\][-+]?[ \t]+)"
+    r"For future (?:agent|AI|Claude|Codex)[ \t]*$"
 )
 _VALIDATION_EXEMPT_ROOT_FILES = {
     "_CLAUDE.md", "AGENTS.md", "Home.md", "index.md", "log.md",
@@ -1024,7 +1029,9 @@ def validate_note(rel: str) -> Dict[str, Any]:
             issues.append(f"duplicate future-agent preambles: found {duplicate_count}")
         after = note_body[cursor:]
         first_line = next((line.strip() for line in after.splitlines() if line.strip()), "")
-        if not first_line or first_line.startswith("##"):
+        # A callout preamble continues on `> ` lines, so a bare `>` is as empty
+        # as a blank line under a heading.
+        if not first_line.lstrip(">").strip() or first_line.startswith("##"):
             issues.append("future-agent preamble is empty")
     index = _stem_index(vault)
     seen = set()

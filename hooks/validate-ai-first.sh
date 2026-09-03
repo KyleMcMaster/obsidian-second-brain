@@ -104,16 +104,32 @@ path_key() {
 INPUT=$(cat)
 
 # Write/Edit: tool_input.file_path. VS Code create_file: tool_input.filePath.
+# NotebookEdit: tool_input.notebook_path - an .ipynb, so the .md gate below
+# drops it; it is read here so a notebook write is not mistaken for an unknown
+# payload shape.
 FILE=$(printf '%s' "$INPUT" | jq -r '
   .tool_input.file_path
   // .tool_input.filePath
+  // .tool_input.notebook_path
+  // .tool_input.notebookPath
   // .args.file_path
   // .args.filePath
   // ""
 ' 2>/dev/null)
 
-# Bail silently on unparseable input or empty path
-[[ -z "$FILE" ]] && exit 0
+# Unparseable input, or input that names no tool, is not a write this hook was
+# asked about: bail silently. A payload that names a tool but carries no path
+# key this hook knows is host drift (a new editor, a renamed field): the matcher
+# fired, so a write happened, and the hook could not check it. Say so once on
+# stderr and exit 1 (non-blocking; the write stands) instead of exiting 0 and
+# looking exactly like "not a vault file" (#171).
+if [[ -z "$FILE" ]]; then
+  TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // ""' 2>/dev/null)
+  [[ -z "$TOOL" ]] && exit 0
+  KEYS=$(printf '%s' "$INPUT" | jq -r '[.tool_input, .args] | map(select(type == "object")) | add // {} | keys | join(", ")' 2>/dev/null)
+  printf 'AI-first hook: fired on %s but found no file path to check (payload keys: %s). The write was NOT validated.\n' "$TOOL" "${KEYS:-none}" >&2
+  exit 1
+fi
 FILE=$(normalize_path "$FILE")
 # Classification (the .md gate, the vault scope, the excluded folders) uses the
 # comparison form; FILE itself stays the real path for reading the note.
@@ -222,8 +238,13 @@ fi
 
 # ── Check 4: 'For future agent' preamble in body ────────────────────────────
 BODY=$(awk '/^---$/{c++; if (c<2) next; next} c>=2' "$READ_FILE")
-if ! printf '%s\n' "$BODY" | grep -qE '^##[[:space:]]+For future (agent|AI|Claude|Codex)[[:space:]]*$' ; then
-  WARNINGS+=("$BASENAME missing '## For future agent' preamble (required by ai-first-rules.md rule #2).")
+# Two accepted spellings (ai-first-rules.md rule #2): the `## For future agent`
+# heading every command writes, and the Obsidian callout form
+# `> [!info]- For future agent` (any callout type, folded or not) a vault may
+# prefer so a human sees the note content first (#237). Nothing else counts.
+PREAMBLE_RE='^(##[[:space:]]+|>[[:space:]]*\[![A-Za-z][A-Za-z0-9_-]*\][-+]?[[:space:]]+)For future (agent|AI|Claude|Codex)[[:space:]]*$'
+if ! printf '%s\n' "$BODY" | grep -qE "$PREAMBLE_RE" ; then
+  WARNINGS+=("$BASENAME missing '## For future agent' preamble (or its callout form '> [!info]- For future agent'; required by ai-first-rules.md rule #2).")
 fi
 
 # ── Check 5: non-ASCII substitution characters ───────────────────────────────

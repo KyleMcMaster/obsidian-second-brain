@@ -364,7 +364,11 @@ def _max_pairwise_similarity(notes: dict, files: list) -> float:
     # (stress-test fix 8/24). Strip what all notes share, compare what's unique.
     def _prose(rel: str) -> str:
         text = FRONTMATTER_RE.sub("", notes[rel]["content"], count=1)
-        text = re.sub(r"## For future (?:agent|AI|Claude|Codex)", "", text)
+        # Both spellings rule 2 accepts: the heading and the callout form (#237).
+        text = re.sub(
+            r"(?:##|>[ \t]*\[![A-Za-z][\w-]*\][-+]?)[ \t]+For future (?:agent|AI|Claude|Codex)",
+            "", text,
+        )
         return re.sub(r"\s+", " ", text).strip()[:1000]
 
     bodies = [_prose(f) for f in files]
