@@ -3,18 +3,10 @@
 set -e
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Home for config and Claude Code state. On Windows shells (Git Bash, MSYS2,
-# Cygwin) that is USERPROFILE, which is what Python's Path.home() and Claude
-# Code resolve ~ to there; HOME can point at another drive (a corporate roaming
-# home) and would split the config between the bash and Python halves.
-# Elsewhere HOME is the home. Uses bash 3.2 features only.
-case "$(uname -s 2>/dev/null)" in
-  MINGW*|MSYS*|CYGWIN*)
-    OSB_WIN=1
-    OSB_HOME="${USERPROFILE:-$HOME}"
-    OSB_HOME="$(cygpath -u "$OSB_HOME" 2>/dev/null || printf '%s' "${OSB_HOME//\\//}")" ;;
-  *) OSB_WIN=0; OSB_HOME="$HOME" ;;
-esac
+# Home for config and Claude Code state (OSB_HOME, OSB_WIN): USERPROFILE on
+# Windows shells, HOME elsewhere. See scripts/platform-home.sh.
+. "$SKILL_DIR/scripts/platform-home.sh"
+osb_platform_home
 CLAUDE_DIR="$OSB_HOME/.claude"
 COMMANDS_DIR="$CLAUDE_DIR/commands"
 SKILLS_DIR="$CLAUDE_DIR/skills"

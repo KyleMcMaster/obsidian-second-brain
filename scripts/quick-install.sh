@@ -14,6 +14,9 @@ set -euo pipefail
 # Code resolve ~ to there; HOME can point at another drive (a corporate roaming
 # home) and would split the config between the bash and Python halves.
 # Elsewhere HOME is the home. Uses bash 3.2 features only.
+# Inline copy of scripts/platform-home.sh on purpose: this script runs via
+# curl | bash before any checkout exists, so there is nothing to source.
+# tests/test_platform_home.py fails if the copies drift.
 case "$(uname -s 2>/dev/null)" in
   MINGW*|MSYS*|CYGWIN*)
     OSB_WIN=1

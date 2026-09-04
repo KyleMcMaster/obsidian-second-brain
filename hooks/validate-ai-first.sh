@@ -150,6 +150,9 @@ if [[ -z "$VAULT" ]]; then
   # Code resolve ~ to there; HOME can point at another drive (a corporate roaming
   # home) and would split the config between the bash and Python halves.
   # Elsewhere HOME is the home. Uses bash 3.2 features only.
+  # Inline copy of scripts/platform-home.sh on purpose: this file is copied by
+  # hand into other harnesses' hook systems and must stay standalone.
+  # tests/test_platform_home.py fails if the copies drift.
   case "$(uname -s 2>/dev/null)" in
     MINGW*|MSYS*|CYGWIN*)
       OSB_WIN=1
