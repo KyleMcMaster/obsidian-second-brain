@@ -65,8 +65,8 @@
 </p>
 
 <p align="center">
-  <strong>v0.14 - The Harvest (July 2026):</strong> we scanned all 408 forks of this repo and shipped the best ideas back upstream, crediting every author.<br/>
-  <em>Multi-turn /obsidian-brainstorm, bounded vault recall, full-page source reading, Brave + Tavily sources, a guarded updater, supersession-aware search, secret detection, pt-BR triggers - and one Agent Skills build serving Codex, OpenCode, Antigravity, and Copilot CLI (v0.13). 198-test CI wall.</em>
+  <strong>v0.15 - The Port (September 2026):</strong> the plugin now runs on Windows the way it runs on macOS and Linux, fixed end to end by a contributor across two PRs.<br/>
+  <em>Windows paths, CRLF and BOM notes, UTF-8 everywhere, a USERPROFILE-aware config home; plus Gemini-first /podcast with a free Whisper fallback, tag syntax and taxonomy checks, Simplified Chinese triggers, /obsidian-reindex, an Obsidian lint plugin, platform ownership, AI-FIRST.md, a reproducible retrieval benchmark, a generated docs site, typed edges, and the callout preamble. 763-test CI wall.</em>
   <a href="CHANGELOG.md">See the changelog &rarr;</a>
 </p>
 

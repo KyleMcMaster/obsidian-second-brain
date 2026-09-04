@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-04 - The Port
+
 ### Added
 
 - **`/podcast` summarizes Gemini-first with Grok fallback, and Apple `?i=` episode links resolve to the right episode (#233, by @konsone in #235).** Summarization mirrors `/youtube`: `GEMINI_API_KEY` set means Gemini (free tier, 1M context) with a transparent fall back to Grok on any failure; no key means the old Grok-only behavior. This is what makes the 480k transcript cap from #234 free on the default path. Apple's `?i=<trackId>` never appears in RSS guids, so `/podcast` used to fall back silently to the most recent episode; a second iTunes lookup (`entity=podcastEpisode`) now resolves the id to its title and `_pick_entry` matches on that. Covered by `tests/test_podcast_resolution.py`.
